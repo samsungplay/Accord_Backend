@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -21,6 +22,8 @@ public class GithubAuthenticationSuccessHandler implements AuthenticationSuccess
 
     @Autowired
     JWTHandler jwtHandler;
+    @Value("${process.env}")
+    String processEnv;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -41,13 +44,13 @@ public class GithubAuthenticationSuccessHandler implements AuthenticationSuccess
                 .sameSite("Strict")
                 .httpOnly(false)
                 //dev only
-                .secure(false)
+                .secure(processEnv.equals("prod"))
                 .build();
         ResponseCookie cookie2 = ResponseCookie.from("accord_refresh_token", refreshToken)
                 .path("/")
                         .sameSite("Strict")
                                 .httpOnly(false)
-                                        .secure(false)
+                                        .secure(processEnv.equals("prod"))
                                                 .build();
 
 //        response.getOutputStream().println(mapper.writeValueAsString(jwtMap));
