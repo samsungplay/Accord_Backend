@@ -49,7 +49,7 @@ public class SocketEventListener {
     private JanusService janusService;
     @Qualifier("socketSessionMap")
     @Autowired
-    private Map socketSessionMap;
+    private Map<Integer, WebSocketSession> socketSessionMap;
 
 
     @EventListener
@@ -87,7 +87,7 @@ public class SocketEventListener {
 
             janusService.destroyConnection(userService.extractId(event.getUser().getName()));
 
-            socketSessionMap.remove(event.getUser().getName());
+            socketSessionMap.remove(Integer.parseInt(event.getUser().getName().split("@")[1]));
         }
     }
 }

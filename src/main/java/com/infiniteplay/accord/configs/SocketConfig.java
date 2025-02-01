@@ -44,7 +44,7 @@ public class SocketConfig  implements WebSocketMessageBrokerConfigurer {
     @Value("${client.url}")
     private String clientUrl;
 
-    private Map<String, WebSocketSession> sessionMap = new ConcurrentHashMap<>();
+    private Map<Integer, WebSocketSession> sessionMap = new ConcurrentHashMap<>();
 
     public SocketConfig(SocketJWTInterceptor socketJWTInterceptor) {
         this.socketJWTInterceptor = socketJWTInterceptor;
@@ -58,7 +58,7 @@ public class SocketConfig  implements WebSocketMessageBrokerConfigurer {
     }
 
     @Bean(name = "socketSessionMap")
-    public Map<String, WebSocketSession> sessionMap() {
+    public Map<Integer, WebSocketSession> sessionMap() {
         return sessionMap;
     }
 
@@ -83,18 +83,14 @@ public class SocketConfig  implements WebSocketMessageBrokerConfigurer {
                     @Override
                     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
 
-                        String cookie = session.getHandshakeHeaders().get("cookie").get(0);
-                        int firstIndex = cookie.indexOf("accord_access_token=") + "accord_access_token=".length();
-                        int secondIndex = cookie.indexOf(";", firstIndex);
+                        int userId = Integer.parseInt(session.getUri().getQuery().split("=")[1]);
 
-                        String accessToken = secondIndex == -1 ? cookie.substring(firstIndex) : cookie.substring(firstIndex, secondIndex);
                         try {
-                            Authentication authentication = jwtHandler.readAccessToken(accessToken);
-                            if(sessionMap.containsKey(authentication.getName())) {
+                            if(sessionMap.containsKey(userId)) {
                                 //duplicate session found, close the old connection
-                                sessionMap.get(authentication.getName()).close();
+                                sessionMap.get(userId).close();
                             }
-                            sessionMap.put(authentication.getName(), session);
+                            sessionMap.put(userId, session);
                         }
                         catch(Exception e) {
                             session.close();
