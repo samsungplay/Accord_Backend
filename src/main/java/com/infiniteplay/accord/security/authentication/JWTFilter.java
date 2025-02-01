@@ -1,6 +1,7 @@
 package com.infiniteplay.accord.security.authentication;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.infiniteplay.accord.repositories.UserRepository;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Header;
 import io.jsonwebtoken.JwtException;
@@ -28,9 +29,11 @@ public class JWTFilter extends OncePerRequestFilter {
 
     private final JWTHandler jwtHandler;
     private final ObjectMapper mapper = new ObjectMapper();
+    private final UserRepository userRepository;
 
-    public JWTFilter(JWTHandler jwtHandler) {
+    public JWTFilter(JWTHandler jwtHandler, UserRepository userRepository) {
         this.jwtHandler = jwtHandler;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -38,60 +41,75 @@ public class JWTFilter extends OncePerRequestFilter {
 
 
         //validate jwt authorization header
-        if(request.getHeader("Authorization") != null) {
+        if (request.getHeader("Authorization") != null) {
             String header = request.getHeader("Authorization");
-            if(header.startsWith("Bearer ")) {
+            if (header.startsWith("Bearer ")) {
                 String token = header.substring(7).strip();
                 try {
                     Authentication authentication = jwtHandler.readAccessToken(token);
-                    //jwt valid!
-                    SecurityContext securityContext = SecurityContextHolder.getContext();
-                    securityContext.setAuthentication(authentication);
+
+                    //check if user actually exists
+                    int id = Integer.parseInt(authentication.getName().split("@")[1]);
+
+                    if (!userRepository.existsById(id)) {
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        Map<String, String> errors = new HashMap<>();
+                        errors.put("error", "invalid user");
+                        response.getOutputStream().println(mapper.writeValueAsString(errors));
+                    } else {
+                        //jwt valid!
+                        SecurityContext securityContext = SecurityContextHolder.getContext();
+                        securityContext.setAuthentication(authentication);
+                    }
+
 
                     filterChain.doFilter(request, response);
                 } catch (ExpiredJwtException e) {
                     //jwt expired (i.e. access token expired)
                     logger.debug("Jwt expired");
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    Map<String,String> errors = new HashMap<>();
+                    Map<String, String> errors = new HashMap<>();
                     errors.put("error", "invalid token");
                     response.getOutputStream().println(mapper.writeValueAsString(errors));
-                }
-                catch(JwtException e) {
+                } catch (JwtException e) {
                     //jwt outright invalid; ignore
                     logger.debug("Jwt outright invalid");
                     filterChain.doFilter(request, response);
                 }
-            }
-            else {
+            } else {
                 logger.debug("filterChain invoked");
                 filterChain.doFilter(request, response);
             }
-        }
-
-        else if(request.getHeader("Refresh-Token") != null) {
+        } else if (request.getHeader("Refresh-Token") != null) {
             String header = request.getHeader("Refresh-Token");
             try {
                 Authentication authentication = jwtHandler.readRefreshToken(header);
-                //is refresh token
-                logger.debug("Jwt refreshed");
-                response.setStatus(HttpServletResponse.SC_CREATED);
+                //check if user actually exists
+                int id = Integer.parseInt(authentication.getName().split("@")[1]);
+
+                if (!userRepository.existsById(id)) {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    Map<String, String> errors = new HashMap<>();
+                    errors.put("error", "invalid user");
+                    response.getOutputStream().println(mapper.writeValueAsString(errors));
+                } else {
+                    //is refresh token
+                    logger.debug("Jwt refreshed");
+                    response.setStatus(HttpServletResponse.SC_CREATED);
 //                response.setHeader("Access-Token", jwtHandler.createToken(authentication.getName(), authentication.getAuthorities(),false));
-                Map<String, String> accessTokenMap = new HashMap<>();
-                accessTokenMap.put("access_token",jwtHandler.createToken(authentication.getName(), authentication.getAuthorities(),false) );
-                response.getOutputStream().println(mapper.writeValueAsString(accessTokenMap));
-            }
-            catch(JwtException e) {
-                logger.debug("Jwt refresh invaild");
+                    Map<String, String> accessTokenMap = new HashMap<>();
+                    accessTokenMap.put("access_token", jwtHandler.createToken(authentication.getName(), authentication.getAuthorities(), false));
+                    response.getOutputStream().println(mapper.writeValueAsString(accessTokenMap));
+
+                }
+            } catch (JwtException e) {
+                logger.debug("Jwt refresh invalid");
                 filterChain.doFilter(request, response);
             }
-        }
-
-        else {
+        } else {
             logger.info("passthrough");
             filterChain.doFilter(request, response);
         }
-
 
 
     }
