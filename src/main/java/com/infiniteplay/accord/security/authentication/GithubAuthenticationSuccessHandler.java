@@ -24,6 +24,8 @@ public class GithubAuthenticationSuccessHandler implements AuthenticationSuccess
     JWTHandler jwtHandler;
     @Value("${process.env}")
     String processEnv;
+    @Value("{client.url}")
+    String clientUrl;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -56,7 +58,7 @@ public class GithubAuthenticationSuccessHandler implements AuthenticationSuccess
 //        response.getOutputStream().println(mapper.writeValueAsString(jwtMap));
         response.addHeader("Set-Cookie", cookie.toString());
         response.addHeader("Set-Cookie",cookie2.toString());
-        response.setHeader("Location","http://localhost:3000/dashboard");
+        response.setHeader("Location",clientUrl + "/dashboard");
         log.info("[OAuth 2.0 GITHUB] : Jwt token issued");
     }
 }
