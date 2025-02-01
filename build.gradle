@@ -1,0 +1,66 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.3.0'
+	id 'io.spring.dependency-management' version '1.1.5'
+}
+
+group = 'com.infiniteplay'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+}
+
+configurations {
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	runtimeOnly 'org.postgresql:postgresql'
+	//developmentOnly 'org.springframework.boot:spring-boot-devtools'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation group: 'io.jsonwebtoken', name: 'jjwt', version: '0.12.6'
+	// https://mvnrepository.com/artifact/com.bucket4j/bucket4j-core
+	implementation group: 'com.bucket4j', name: 'bucket4j-core', version: '8.7.0'
+	// jsoup
+	implementation 'org.jsoup:jsoup:1.18.1'
+
+	// DJL Core Library
+	implementation 'ai.djl:api:0.31.0'
+
+	// DJL OnnxRuntime Engine (if using ONNX models)
+	implementation 'ai.djl.onnxruntime:onnxruntime-engine:0.31.0'
+
+
+	// Add other dependencies based on your needs
+	implementation 'ai.djl.tensorflow:tensorflow-api:0.31.0'
+	implementation 'ai.djl.huggingface:tokenizers:0.31.0'
+
+
+	implementation group: 'nl.martijndwars', name: 'web-push', version: '5.1.1'
+	implementation group: 'org.bouncycastle', name: 'bcprov-jdk15on', version: '1.70'
+
+
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
