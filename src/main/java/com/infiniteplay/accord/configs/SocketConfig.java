@@ -2,6 +2,7 @@ package com.infiniteplay.accord.configs;
 
 import com.infiniteplay.accord.interceptors.SocketJWTInterceptor;
 import com.infiniteplay.accord.security.authentication.JWTHandler;
+import com.infiniteplay.accord.utils.GenericException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -34,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Configuration
 @EnableWebSocketMessageBroker
-public class SocketConfig  implements WebSocketMessageBrokerConfigurer {
+public class SocketConfig implements WebSocketMessageBrokerConfigurer {
 
 
     @Autowired
@@ -53,7 +54,7 @@ public class SocketConfig  implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        config.enableSimpleBroker("/general","/user");
+        config.enableSimpleBroker("/general", "/user");
         config.setApplicationDestinationPrefixes("/app");
     }
 
@@ -63,11 +64,10 @@ public class SocketConfig  implements WebSocketMessageBrokerConfigurer {
     }
 
 
-
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/socket").setAllowedOrigins("http://localhost:3000",clientUrl);
-        registry.addEndpoint("/socket").setAllowedOrigins("http://localhost:3000",clientUrl).withSockJS();
+        registry.addEndpoint("/socket").setAllowedOrigins("http://localhost:3000", clientUrl);
+        registry.addEndpoint("/socket").setAllowedOrigins("http://localhost:3000", clientUrl).withSockJS();
     }
 
 
@@ -83,17 +83,32 @@ public class SocketConfig  implements WebSocketMessageBrokerConfigurer {
                     @Override
                     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
 
-                        System.out.println("socket connection query=" + session.getUri().getQuery());
-                        int userId = Integer.parseInt(session.getUri().getQuery().split("=")[1]);
+                        String query = session.getUri().getQuery();
+
+                        int userId = 0;
+                        String[] pairs = query.split("&");
+                        for (String pair : pairs) {
+                            int idx = pair.indexOf("=");
+                            if (idx > 0) {
+                                String key = pair.substring(0, idx);
+                                String value = pair.substring(idx + 1);
+                                if(key.equals("userId")) {
+                                    userId = Integer.parseInt(value);
+                                }
+                            }
+                        }
+
+                        if(userId == 0) {
+                            throw new GenericException("Invalid connection");
+                        }
 
                         try {
-                            if(sessionMap.containsKey(userId)) {
+                            if (sessionMap.containsKey(userId)) {
                                 //duplicate session found, close the old connection
                                 sessionMap.get(userId).close();
                             }
                             sessionMap.put(userId, session);
-                        }
-                        catch(Exception e) {
+                        } catch (Exception e) {
                             session.close();
                             e.printStackTrace();
                         }
@@ -130,7 +145,6 @@ public class SocketConfig  implements WebSocketMessageBrokerConfigurer {
     public boolean configureMessageConverters(List<MessageConverter> messageConverters) {
         return WebSocketMessageBrokerConfigurer.super.configureMessageConverters(messageConverters);
     }
-
 
 
 }
