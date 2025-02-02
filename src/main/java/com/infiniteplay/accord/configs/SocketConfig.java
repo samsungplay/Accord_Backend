@@ -83,6 +83,7 @@ public class SocketConfig  implements WebSocketMessageBrokerConfigurer {
                     @Override
                     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
 
+                        System.out.println("socket connection query=" + session.getUri().getQuery());
                         int userId = Integer.parseInt(session.getUri().getQuery().split("=")[1]);
 
                         try {
