@@ -24,7 +24,7 @@ public class GithubAuthenticationSuccessHandler implements AuthenticationSuccess
     JWTHandler jwtHandler;
     @Value("${process.env}")
     String processEnv;
-    @Value("{client.url}")
+    @Value("${client.url}")
     String clientUrl;
 
     private final ObjectMapper mapper = new ObjectMapper();

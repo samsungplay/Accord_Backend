@@ -656,6 +656,9 @@ public class CallService {
                 throw new GenericException("This Chatroom already has an ongoing call");
             }
             Set<User> participants = chatRoom.getParticipants();
+            if(participants.size() == 1) {
+                throw new GenericException("You cannot call in a solo chatroom");
+            }
             User user = userService.findByUsernameWithId(usernameWithId);
 
             //if user has an existing ongoing call..

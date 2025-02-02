@@ -25,7 +25,7 @@ public class GithubAuthenticationFailureHandler implements AuthenticationFailure
     private JWTHandler jwtHandler;
     @Value("${process.env}")
     String processEnv;
-    @Value("{client.url}")
+    @Value("${client.url}")
     String clientUrl;
 
     @Override
