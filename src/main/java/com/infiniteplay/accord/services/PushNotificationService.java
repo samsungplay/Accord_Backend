@@ -62,15 +62,18 @@ public class PushNotificationService {
 
 
     @Transactional
-    public void subscribe(String usernameWithId, PushSubscriptionDTO pushSubscriptionDTO) throws GenericException {
+    public void subscribe(String usernameWithId, PushSubscriptionDTO pushSubscriptionDTO, String loginSessionToken) throws GenericException {
         //may override subscription if it exists
+        if(loginSessionToken == null || loginSessionToken.isEmpty()) {
+            throw new GenericException("Invalid login session token while subscribing to push notifications");
+        }
         int userId = userService.extractId(usernameWithId);
         PushSubscription existing = pushSubscriptionRepository.findByUserId(userId);
 
         if (existing != null) {
             existing.setAuth(pushSubscriptionDTO.getAuth());
             existing.setP256dh(pushSubscriptionDTO.getP256dh());
-            existing.setLoginSessionToken(pushSubscriptionDTO.getLoginSessionToken());
+            existing.setLoginSessionToken(loginSessionToken);
             existing.setUserId(userId);
             existing.setEndpoint(pushSubscriptionDTO.getEndpoint());
             pushSubscriptionRepository.save(existing);
@@ -79,7 +82,7 @@ public class PushNotificationService {
         PushSubscription pushSubscription = new PushSubscription();
         pushSubscription.setAuth(pushSubscriptionDTO.getAuth());
         pushSubscription.setP256dh(pushSubscriptionDTO.getP256dh());
-        pushSubscription.setLoginSessionToken(pushSubscriptionDTO.getLoginSessionToken());
+        pushSubscription.setLoginSessionToken(loginSessionToken);
         pushSubscription.setUserId(userId);
         pushSubscription.setEndpoint(pushSubscriptionDTO.getEndpoint());
 
@@ -92,7 +95,7 @@ public class PushNotificationService {
     public void unsubscribe(String usernameWithId) throws GenericException {
         PushSubscription pushSubscription = pushSubscriptionRepository.findByUserId(userService.extractId(usernameWithId));
         if (pushSubscription == null) {
-            throw new GenericException("No subscription found");
+            return;
         }
         pushSubscriptionRepository.delete(pushSubscription);
     }

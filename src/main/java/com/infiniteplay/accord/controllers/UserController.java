@@ -6,10 +6,13 @@ import com.infiniteplay.accord.entities.ChatRoom;
 import com.infiniteplay.accord.entities.User;
 import com.infiniteplay.accord.models.UserSettingsDTO;
 import com.infiniteplay.accord.models.UserStatus;
+import com.infiniteplay.accord.services.AuthenticationService;
+import com.infiniteplay.accord.services.PushNotificationService;
 import com.infiniteplay.accord.services.UserService;
 import com.infiniteplay.accord.utils.GenericException;
 import com.infiniteplay.accord.utils.UserException;
 import jakarta.persistence.OptimisticLockException;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.StaleObjectStateException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,23 +30,37 @@ import java.util.*;
 public class UserController {
     @Autowired
     private UserService userService;
+    @Autowired
+    private AuthenticationService authenticationService;
+    @Autowired
+    private PushNotificationService pushNotificationService;
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(Authentication authentication, HttpServletResponse response) {
+
+        authenticationService.logout(response);
+
+        pushNotificationService.unsubscribe(authentication.getName());
+
+        return ResponseEntity.ok().build();
+    }
 
 
     @PostMapping("/muteChatroom/{chatRoomId}")
     public ResponseEntity<List<Integer>> muteChatRoom(Authentication authentication, @PathVariable int chatRoomId) {
-        List<Integer> mutedChatRoomIds = userService.muteChatRoomNotification(authentication.getName(),chatRoomId);
+        List<Integer> mutedChatRoomIds = userService.muteChatRoomNotification(authentication.getName(), chatRoomId);
         return ResponseEntity.ok(mutedChatRoomIds);
     }
 
     @PostMapping("/unmuteChatroom/{chatRoomId}")
     public ResponseEntity<List<Integer>> unmuteChatRoom(Authentication authentication, @PathVariable int chatRoomId) {
-        List<Integer> mutedChatRoomIds = userService.unmuteChatRoomNotification(authentication.getName(),chatRoomId);
+        List<Integer> mutedChatRoomIds = userService.unmuteChatRoomNotification(authentication.getName(), chatRoomId);
         return ResponseEntity.ok(mutedChatRoomIds);
     }
 
     @PostMapping("/status")
     public ResponseEntity<Void> updateUserStatus(Authentication authentication, @RequestBody String status) {
-        userService.updateStatus(authentication.getName(), UserStatus.valueOf(status.substring(0,status.length()-1)));
+        userService.updateStatus(authentication.getName(), UserStatus.valueOf(status.substring(0, status.length() - 1)));
 
         return ResponseEntity.ok().build();
     }
@@ -62,7 +79,7 @@ public class UserController {
 
     @GetMapping("/youmayknow")
     public ResponseEntity<List<User>> getYouMayKnow(Authentication authentication) {
-        return ResponseEntity.ok(userService.getYouMayKnow(authentication.getName(),5));
+        return ResponseEntity.ok(userService.getYouMayKnow(authentication.getName(), 5));
     }
 
     @GetMapping("/settings")
@@ -72,7 +89,7 @@ public class UserController {
 
     @PostMapping("/enableScreenShare/{chatRoomId}")
     public ResponseEntity<Void> updateScreenShareEnable(Authentication authentication, @RequestBody Map<String, String> payload,
-                                                  @PathVariable String chatRoomId) {
+                                                        @PathVariable String chatRoomId) {
         userService.setEnableScreenShare(authentication.getName(), payload.get("enabled"), chatRoomId);
         return ResponseEntity.ok().build();
     }
@@ -122,7 +139,7 @@ public class UserController {
                                               @RequestParam("editProfileStatusMessage") String statusMessage,
                                               @RequestParam("editProfileAboutMe") String aboutMe,
                                               @RequestParam("editProfileImage") MultipartFile profileImage
-                                              ) {
+    ) {
 
         User user = userService.updateUserProfile(authentication.getName(), username, nickname, email, statusMessage, aboutMe, profileImage);
         return ResponseEntity.ok(user);
@@ -147,7 +164,7 @@ public class UserController {
     @PostMapping("/backgrounds")
     public ResponseEntity<Void> addBackground(Authentication authentication, @RequestParam("name") String name,
                                               @RequestParam("file") MultipartFile file) {
-        userService.addBackground(authentication.getName(),name,file);
+        userService.addBackground(authentication.getName(), name, file);
 
         return ResponseEntity.ok().build();
     }
@@ -155,7 +172,7 @@ public class UserController {
     @GetMapping("/aboutme/{targetUserId}")
     public ResponseEntity<String> getAboutMe(Authentication authentication, @PathVariable int targetUserId) {
 
-        return ResponseEntity.ok(userService.getAboutMe(authentication.getName(),targetUserId));
+        return ResponseEntity.ok(userService.getAboutMe(authentication.getName(), targetUserId));
 
     }
 
@@ -165,21 +182,22 @@ public class UserController {
         return ResponseEntity.ok(userService.getAboutMe(authentication.getName()));
 
     }
+
     @DeleteMapping("/backgrounds/{name}")
     public ResponseEntity<Void> addBackground(Authentication authentication, @PathVariable String name) {
-        userService.deleteBackground(authentication.getName(),name);
+        userService.deleteBackground(authentication.getName(), name);
 
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/mutual/friends/{targetUserId}")
     public List<User> getMutualFriends(Authentication authentication, @PathVariable int targetUserId) {
-        return userService.getMutualFriends(authentication.getName(),targetUserId);
+        return userService.getMutualFriends(authentication.getName(), targetUserId);
     }
 
     @GetMapping("/mutual/chatrooms/{targetUserId}")
     public List<ChatRoom> getMutualChatrooms(Authentication authentication, @PathVariable int targetUserId) {
-        return userService.getMutualChatrooms(authentication.getName(),targetUserId);
+        return userService.getMutualChatrooms(authentication.getName(), targetUserId);
     }
 
 
@@ -205,7 +223,7 @@ public class UserController {
 
     @DeleteMapping("/friends/pendings/outgoing/{usernameWithId}")
     public ResponseEntity<Void> cancelFriendRequest(@PathVariable("usernameWithId") String usernameWithId, Authentication authentication) {
-        userService.cancelFriendRequest(authentication.getName(),usernameWithId);
+        userService.cancelFriendRequest(authentication.getName(), usernameWithId);
         return ResponseEntity.ok().build();
     }
 
@@ -253,7 +271,7 @@ public class UserController {
         return ResponseEntity.badRequest().body(ex.getMessage());
     }
 
-    @ExceptionHandler(value={
+    @ExceptionHandler(value = {
             StaleObjectStateException.class,
             OptimisticLockingFailureException.class,
             OptimisticLockException.class

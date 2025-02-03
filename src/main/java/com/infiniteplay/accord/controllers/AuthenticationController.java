@@ -30,7 +30,6 @@ import java.util.Map;
 public class AuthenticationController {
 
     private final AuthenticationService authenticationService;
-    private final JWTHandler jwtHandler;
 
     @PostMapping("/register")
     public ResponseEntity<Void> register(@RequestBody RegisterDetails registerDetails) {
@@ -39,14 +38,29 @@ public class AuthenticationController {
     }
 
     @PostMapping("/registerGithub")
-    public ResponseEntity<Void> registerGithub(@RequestBody OauthRegisterDetails registerDetails) {
+    public ResponseEntity<Void> registerGithub(@RequestBody OauthRegisterDetails registerDetails,
+                                               HttpServletRequest request) {
 
-        int accountId = jwtHandler.isValidGithubOauthToken(registerDetails.getRegistrationToken());
-        if(accountId != -1) {
-            authenticationService.registerGithub(registerDetails,accountId);
-            return ResponseEntity.status(HttpStatus.CREATED).build();
+        Cookie[] cookies = request.getCookies();
+        String githubRegistrationToken = null;
+
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if (cookie.getName().equals("github_registration_token")) {
+
+                    githubRegistrationToken = cookie.getValue();
+                }
+            }
         }
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+
+        if (githubRegistrationToken == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+
+        authenticationService.registerGithub(registerDetails, githubRegistrationToken);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+
     }
 
     @GetMapping("/authenticate")
@@ -60,12 +74,14 @@ public class AuthenticationController {
     }
 
     @ExceptionHandler(RegisterException.class)
-    public ResponseEntity<Map<String,String>> handleRegisterException(RegisterException exc) {
-
+    public ResponseEntity<Map<String, String>> handleRegisterException(RegisterException exc) {
+        if(exc.getType().equals("Registration Token")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         return ResponseEntity.badRequest().body(exc.toErrorData());
     }
 
-    @ExceptionHandler(value={
+    @ExceptionHandler(value = {
             StaleObjectStateException.class,
             OptimisticLockingFailureException.class,
             OptimisticLockException.class

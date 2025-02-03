@@ -37,12 +37,11 @@ public class GithubAuthenticationFailureHandler implements AuthenticationFailure
             String accountId = exception.getMessage().split(" ")[2];
             String token = jwtHandler.createGithubRegistrationToken(accountId);
             response.setHeader("Location", clientUrl + "/authentication?register=true&github=" + username);
-            ResponseCookie cookie = ResponseCookie.from("github-registration-token", token)
+            ResponseCookie cookie = ResponseCookie.from("github_registration_token", token)
                     .path("/")
-                    .sameSite("Strict")
-                    .httpOnly(false)
-                    //dev only
-                    .secure(processEnv.equals("prod"))
+                    .sameSite(processEnv.equals("prod") ? "Lax" : "None")
+                    .httpOnly(true)
+                    .secure(true)
                     .build();
             response.setHeader("Set-Cookie", cookie.toString());
         }

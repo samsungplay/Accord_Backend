@@ -7,9 +7,12 @@ import io.jsonwebtoken.Header;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -30,6 +33,8 @@ public class JWTFilter extends OncePerRequestFilter {
     private final JWTHandler jwtHandler;
     private final ObjectMapper mapper = new ObjectMapper();
     private final UserRepository userRepository;
+    @Value("${process.env}")
+    String processEnv;
 
     public JWTFilter(JWTHandler jwtHandler, UserRepository userRepository) {
         this.jwtHandler = jwtHandler;
@@ -40,50 +45,27 @@ public class JWTFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
 
-        //validate jwt authorization header
-        if (request.getHeader("Authorization") != null) {
-            String header = request.getHeader("Authorization");
-            if (header.startsWith("Bearer ")) {
-                String token = header.substring(7).strip();
-                try {
-                    Authentication authentication = jwtHandler.readAccessToken(token);
+        Cookie[] cookies = request.getCookies();
 
-                    //check if user actually exists
-                    int id = Integer.parseInt(authentication.getName().split("@")[1]);
-
-                    if (!userRepository.existsById(id)) {
-                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                        Map<String, String> errors = new HashMap<>();
-                        errors.put("error", "invalid user");
-                        response.getOutputStream().println(mapper.writeValueAsString(errors));
-                    } else {
-                        //jwt valid!
-                        SecurityContext securityContext = SecurityContextHolder.getContext();
-                        securityContext.setAuthentication(authentication);
-                    }
+        String accessToken = null;
+        String refreshToken = null;
 
 
-                    filterChain.doFilter(request, response);
-                } catch (ExpiredJwtException e) {
-                    //jwt expired (i.e. access token expired)
-                    logger.debug("Jwt expired");
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    Map<String, String> errors = new HashMap<>();
-                    errors.put("error", "invalid token");
-                    response.getOutputStream().println(mapper.writeValueAsString(errors));
-                } catch (JwtException e) {
-                    //jwt outright invalid; ignore
-                    logger.debug("Jwt outright invalid");
-                    filterChain.doFilter(request, response);
+
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if (cookie.getName().equals("accord_access_token")) {
+                    accessToken = cookie.getValue();
+                } else if (cookie.getName().equals("accord_refresh_token")) {
+                    refreshToken = cookie.getValue();
                 }
-            } else {
-                logger.debug("filterChain invoked");
-                filterChain.doFilter(request, response);
             }
-        } else if (request.getHeader("Refresh-Token") != null) {
-            String header = request.getHeader("Refresh-Token");
+        }
+        //validate jwt authorization header
+        if (accessToken != null) {
             try {
-                Authentication authentication = jwtHandler.readRefreshToken(header);
+                Authentication authentication = jwtHandler.readAccessToken(accessToken);
+
                 //check if user actually exists
                 int id = Integer.parseInt(authentication.getName().split("@")[1]);
 
@@ -93,21 +75,54 @@ public class JWTFilter extends OncePerRequestFilter {
                     errors.put("error", "invalid user");
                     response.getOutputStream().println(mapper.writeValueAsString(errors));
                 } else {
-                    //is refresh token
-                    logger.debug("Jwt refreshed");
-                    response.setStatus(HttpServletResponse.SC_CREATED);
-//                response.setHeader("Access-Token", jwtHandler.createToken(authentication.getName(), authentication.getAuthorities(),false));
-                    Map<String, String> accessTokenMap = new HashMap<>();
-                    accessTokenMap.put("access_token", jwtHandler.createToken(authentication.getName(), authentication.getAuthorities(), false));
-                    response.getOutputStream().println(mapper.writeValueAsString(accessTokenMap));
-
+                    //jwt valid!
+                    SecurityContext securityContext = SecurityContextHolder.getContext();
+                    securityContext.setAuthentication(authentication);
+                    logger.info("Jwt verified");
                 }
+
+
+                filterChain.doFilter(request, response);
+            } catch (ExpiredJwtException e) {
+                //jwt expired (i.e. access token expired)
+                logger.debug("Jwt expired");
+                //try to refresh using refresh token
+                if (refreshToken != null) {
+                    try {
+                        Authentication authentication = jwtHandler.readRefreshToken(refreshToken);
+                        int id = Integer.parseInt(authentication.getName().split("@")[1]);
+                        if (!userRepository.existsById(id)) {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            Map<String, String> errors = new HashMap<>();
+                            errors.put("error", "invalid user");
+                            response.getOutputStream().println(mapper.writeValueAsString(errors));
+                        } else {
+                            String newAccessToken = jwtHandler.createToken(authentication.getName(), authentication.getAuthorities(), true);
+                            //refresh access token, (issue a new access token)
+                            ResponseCookie cookie = ResponseCookie.from("accord_access_token", newAccessToken)
+                                    .path("/")
+                                    .sameSite(processEnv.equals("prod") ? "Lax" : "None")
+                                    .httpOnly(true)
+                                    .secure(true)
+                                    .build();
+                            response.addHeader("Set-Cookie", cookie.toString());
+                            logger.debug("jwt refreshed");
+                        }
+                    } catch (Exception ex) {
+                        //refresh token also invalid
+                        filterChain.doFilter(request, response);
+                    }
+                } else {
+                    filterChain.doFilter(request, response);
+                }
+
             } catch (JwtException e) {
-                logger.debug("Jwt refresh invalid");
+                //jwt outright invalid; ignore
+                logger.debug("Jwt outright invalid");
                 filterChain.doFilter(request, response);
             }
+
         } else {
-            logger.info("passthrough");
             filterChain.doFilter(request, response);
         }
 

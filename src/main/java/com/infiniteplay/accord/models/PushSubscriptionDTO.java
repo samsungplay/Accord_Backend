@@ -7,7 +7,6 @@ import lombok.Setter;
 @Setter
 public class PushSubscriptionDTO {
     private String endpoint;
-    private String loginSessionToken;
     private String p256dh;
     private String auth;
 }

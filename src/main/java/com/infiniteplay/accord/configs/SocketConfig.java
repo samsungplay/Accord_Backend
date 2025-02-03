@@ -1,33 +1,23 @@
 package com.infiniteplay.accord.configs;
 
-import com.infiniteplay.accord.interceptors.SocketJWTInterceptor;
+import com.infiniteplay.accord.interceptors.SocketAuthenticationInterceptor;
+import com.infiniteplay.accord.interceptors.SocketUsernameInterceptor;
 import com.infiniteplay.accord.security.authentication.JWTHandler;
 import com.infiniteplay.accord.utils.GenericException;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.messaging.Message;
-import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.converter.MessageConverter;
 import org.springframework.messaging.handler.invocation.HandlerMethodArgumentResolver;
 import org.springframework.messaging.handler.invocation.HandlerMethodReturnValueHandler;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
-import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
-import org.springframework.messaging.support.ChannelInterceptor;
-import org.springframework.security.core.Authentication;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketHandler;
-import org.springframework.web.socket.WebSocketMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.config.annotation.*;
 import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
 import org.springframework.web.socket.handler.WebSocketHandlerDecoratorFactory;
-import org.springframework.web.socket.sockjs.transport.session.WebSocketServerSockJsSession;
 
 import java.util.List;
 import java.util.Map;
@@ -39,17 +29,15 @@ public class SocketConfig implements WebSocketMessageBrokerConfigurer {
 
 
     @Autowired
-    private SocketJWTInterceptor socketJWTInterceptor;
-    @Autowired
     JWTHandler jwtHandler;
     @Value("${client.url}")
     private String clientUrl;
+    @Autowired
+    SocketAuthenticationInterceptor socketAuthenticationInterceptor;
 
     private Map<Integer, WebSocketSession> sessionMap = new ConcurrentHashMap<>();
-
-    public SocketConfig(SocketJWTInterceptor socketJWTInterceptor) {
-        this.socketJWTInterceptor = socketJWTInterceptor;
-    }
+    @Autowired
+    private SocketUsernameInterceptor socketUsernameInterceptor;
 
 
     @Override
@@ -66,10 +54,16 @@ public class SocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/socket").setAllowedOrigins("http://localhost:3000", clientUrl);
-        registry.addEndpoint("/socket").setAllowedOrigins("http://localhost:3000", clientUrl).withSockJS();
+        registry.addEndpoint("/socket").setAllowedOrigins("http://localhost:3000", clientUrl).addInterceptors(socketAuthenticationInterceptor);
+        registry.addEndpoint("/socket").setAllowedOrigins("http://localhost:3000", clientUrl).addInterceptors(socketAuthenticationInterceptor).withSockJS();
     }
 
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(socketUsernameInterceptor);
+        WebSocketMessageBrokerConfigurer.super.configureClientInboundChannel(registration);
+    }
 
     //duplicate session handler
     @Override
@@ -121,10 +115,7 @@ public class SocketConfig implements WebSocketMessageBrokerConfigurer {
         WebSocketMessageBrokerConfigurer.super.configureWebSocketTransport(registry);
     }
 
-    @Override
-    public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(socketJWTInterceptor);
-    }
+
 
     @Override
     public void configureClientOutboundChannel(ChannelRegistration registration) {

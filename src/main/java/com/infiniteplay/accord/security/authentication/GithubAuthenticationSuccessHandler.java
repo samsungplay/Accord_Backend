@@ -43,16 +43,15 @@ public class GithubAuthenticationSuccessHandler implements AuthenticationSuccess
 
         ResponseCookie cookie = ResponseCookie.from("accord_access_token", accessToken)
                 .path("/")
-                .sameSite("Strict")
-                .httpOnly(false)
-                //dev only
-                .secure(processEnv.equals("prod"))
+                .sameSite(processEnv.equals("prod") ? "Lax" : "None")
+                .httpOnly(true)
+                .secure(true)
                 .build();
         ResponseCookie cookie2 = ResponseCookie.from("accord_refresh_token", refreshToken)
                 .path("/")
-                        .sameSite("Strict")
-                                .httpOnly(false)
-                                        .secure(processEnv.equals("prod"))
+                        .sameSite(processEnv.equals("prod") ? "Lax" : "None")
+                                .httpOnly(true)
+                                        .secure(true)
                                                 .build();
 
 //        response.getOutputStream().println(mapper.writeValueAsString(jwtMap));

@@ -4,6 +4,8 @@ import com.infiniteplay.accord.models.PushSubscriptionDTO;
 import com.infiniteplay.accord.services.PushNotificationService;
 import com.infiniteplay.accord.utils.GenericException;
 import jakarta.persistence.OptimisticLockException;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import org.hibernate.StaleObjectStateException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
@@ -20,15 +22,21 @@ public class PushNotificationController {
     }
 
 
-    @PostMapping("/unsubscribe")
-    public ResponseEntity<Void> unsubscribe(Authentication authentication) {
-        pushNotificationService.unsubscribe(authentication.getName());
-        return ResponseEntity.ok().build();
-    }
 
     @PostMapping("/subscribe")
-    public ResponseEntity<Void> subscribe(Authentication authentication, @RequestBody PushSubscriptionDTO pushSubscriptionDTO) {
-        pushNotificationService.subscribe(authentication.getName(), pushSubscriptionDTO);
+    public ResponseEntity<Void> subscribe(Authentication authentication, @RequestBody PushSubscriptionDTO pushSubscriptionDTO,
+                                          HttpServletRequest request) {
+        String refreshToken = null;
+        Cookie[] cookies = request.getCookies();
+        if(cookies != null) {
+            for (Cookie cookie : cookies) {
+                if(cookie.getName().equals("accord_refresh_token")) {
+                    refreshToken = cookie.getValue();
+                    break;
+                }
+            }
+        }
+        pushNotificationService.subscribe(authentication.getName(), pushSubscriptionDTO, refreshToken);
         return ResponseEntity.ok().build();
     }
     @ExceptionHandler(value = {

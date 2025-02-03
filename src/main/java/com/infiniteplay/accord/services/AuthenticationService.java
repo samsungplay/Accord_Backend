@@ -7,10 +7,15 @@ import com.infiniteplay.accord.models.OauthRegisterDetails;
 import com.infiniteplay.accord.models.RegisterDetails;
 import com.infiniteplay.accord.repositories.ChatNotificationCountRepository;
 import com.infiniteplay.accord.repositories.UserRepository;
+import com.infiniteplay.accord.security.authentication.JWTHandler;
 import com.infiniteplay.accord.utils.RegexConstants;
 import com.infiniteplay.accord.utils.RegisterException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,7 +33,31 @@ public class AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final ChatNotificationCountRepository chatNotificationCountRepository;
 
+    @Autowired
+    JWTHandler jwtHandler;
+    @Value("${process.env}")
+    String processEnv;
 
+    public void logout(HttpServletResponse response) {
+        ResponseCookie cookie1 = ResponseCookie.from("accord_access_token","logout")
+                .path("/")
+                .sameSite(processEnv.equals("prod") ? "Lax" : "None")
+                .secure(true)
+                .httpOnly(true)
+                .maxAge(0)
+                .build();
+
+        ResponseCookie cookie2 = ResponseCookie.from("accord_refresh_token","logout")
+                .path("/")
+                .sameSite(processEnv.equals("prod") ? "Lax" : "None")
+                .secure(true)
+                .httpOnly(true)
+                .maxAge(0)
+                .build();
+
+        response.addHeader("Set-Cookie", cookie1.toString());
+        response.addHeader("Set-Cookie", cookie2.toString());
+    }
     public static boolean isValidEmail(String email) {
         return Pattern.compile(RegexConstants.EMAIL_REGEX, Pattern.CASE_INSENSITIVE)
                 .matcher(email)
@@ -175,9 +204,13 @@ public class AuthenticationService {
 
 
     @Transactional
-    public void registerGithub(OauthRegisterDetails registerDetails, int accountId) throws RegisterException {
+    public void registerGithub(OauthRegisterDetails registerDetails, String githubRegistrationToken) throws RegisterException {
         if(validateRegisterDetails(registerDetails)) {
 
+            int accountId = jwtHandler.isValidGithubOauthToken(githubRegistrationToken);
+            if(accountId == -1) {
+                throw new RegisterException("Registration Token","Invalid registration token");
+            }
             User user = new User(null, AccountType.GITHUB, registerDetails.getEmail(), registerDetails.getNickname(),
                     registerDetails.getUsername(),
                     null, registerDetails.getBirthDate());
