@@ -25,10 +25,11 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     User findByEmail(String email);
 
 
-
     User findByAccountIdAndAccountType(Integer accountId, AccountType accountType);
 
 
+    @Query(value="SELECT COUNT(*) > 0 FROM accord_user WHERE id=?1 AND username=?2", nativeQuery = true)
+    boolean existsByUsernameWithId(Integer id, String username);
 
     User findFirstByNicknameOrUsername(String nickname, String username);
 

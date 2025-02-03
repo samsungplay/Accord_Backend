@@ -621,7 +621,6 @@ public class ChatService {
 
     public void dispatchTypingEvent(String usernamewithId, int chatRoomId, List<String> participantUsernameWithIds) throws GenericException {
 
-        System.out.println("dispatch typing event invoked:" +  participantUsernameWithIds + " and " + usernamewithId);
         for(String user : participantUsernameWithIds) {
             if(!user.equals(usernamewithId))
                 broker.convertAndSendToUser(user, "/general/onUserType/" + chatRoomId, userService.extractId(usernamewithId));

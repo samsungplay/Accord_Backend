@@ -67,9 +67,10 @@ public class JWTFilter extends OncePerRequestFilter {
                 Authentication authentication = jwtHandler.readAccessToken(accessToken);
 
                 //check if user actually exists
+                String username = authentication.getName().split("@")[0];
                 int id = Integer.parseInt(authentication.getName().split("@")[1]);
 
-                if (!userRepository.existsById(id)) {
+                if (!userRepository.existsByUsernameWithId(id,username)) {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     Map<String, String> errors = new HashMap<>();
                     errors.put("error", "invalid user");
@@ -90,8 +91,9 @@ public class JWTFilter extends OncePerRequestFilter {
                 if (refreshToken != null) {
                     try {
                         Authentication authentication = jwtHandler.readRefreshToken(refreshToken);
+                        String username = authentication.getName().split("@")[0];
                         int id = Integer.parseInt(authentication.getName().split("@")[1]);
-                        if (!userRepository.existsById(id)) {
+                        if (!userRepository.existsByUsernameWithId(id,username)) {
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             Map<String, String> errors = new HashMap<>();
                             errors.put("error", "invalid user");
