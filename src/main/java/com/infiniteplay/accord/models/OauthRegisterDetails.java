@@ -13,5 +13,4 @@ public class OauthRegisterDetails {
     private final String username;
     private final String nickname;
     private final Date birthDate;
-    private final String registrationToken;
 }
