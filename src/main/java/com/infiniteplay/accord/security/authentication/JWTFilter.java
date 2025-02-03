@@ -36,6 +36,27 @@ public class JWTFilter extends OncePerRequestFilter {
     @Value("${process.env}")
     String processEnv;
 
+    private void resetAuthCookies(HttpServletResponse response) {
+        ResponseCookie cookie1 = ResponseCookie.from("accord_access_token","reset")
+                .path("/")
+                .sameSite(processEnv.equals("prod") ? "Lax" : "None")
+                .secure(true)
+                .httpOnly(true)
+                .maxAge(0)
+                .build();
+
+        ResponseCookie cookie2 = ResponseCookie.from("accord_refresh_token","reset")
+                .path("/")
+                .sameSite(processEnv.equals("prod") ? "Lax" : "None")
+                .secure(true)
+                .httpOnly(true)
+                .maxAge(0)
+                .build();
+
+        response.addHeader("Set-Cookie", cookie1.toString());
+        response.addHeader("Set-Cookie", cookie2.toString());
+    }
+
     public JWTFilter(JWTHandler jwtHandler, UserRepository userRepository) {
         this.jwtHandler = jwtHandler;
         this.userRepository = userRepository;
@@ -74,6 +95,7 @@ public class JWTFilter extends OncePerRequestFilter {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     Map<String, String> errors = new HashMap<>();
                     errors.put("error", "invalid user");
+                    resetAuthCookies(response);
                     response.getOutputStream().println(mapper.writeValueAsString(errors));
                 } else {
                     //jwt valid!
@@ -97,6 +119,7 @@ public class JWTFilter extends OncePerRequestFilter {
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             Map<String, String> errors = new HashMap<>();
                             errors.put("error", "invalid user");
+                            resetAuthCookies(response);
                             response.getOutputStream().println(mapper.writeValueAsString(errors));
                         } else {
                             String newAccessToken = jwtHandler.createToken(authentication.getName(), authentication.getAuthorities(), true);
@@ -108,23 +131,33 @@ public class JWTFilter extends OncePerRequestFilter {
                                     .secure(true)
                                     .build();
                             response.addHeader("Set-Cookie", cookie.toString());
+
+                            //authenticate right away
+                            SecurityContext securityContext = SecurityContextHolder.getContext();
+                            securityContext.setAuthentication(authentication);
+
                             logger.debug("jwt refreshed");
                         }
                     } catch (Exception ex) {
                         //refresh token also invalid
+                        resetAuthCookies(response);
                         filterChain.doFilter(request, response);
                     }
                 } else {
+                    //no refresh cookie present
+                    resetAuthCookies(response);
                     filterChain.doFilter(request, response);
                 }
 
             } catch (JwtException e) {
                 //jwt outright invalid; ignore
                 logger.debug("Jwt outright invalid");
+                resetAuthCookies(response);
                 filterChain.doFilter(request, response);
             }
 
         } else {
+            resetAuthCookies(response);
             filterChain.doFilter(request, response);
         }
 
