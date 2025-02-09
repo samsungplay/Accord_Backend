@@ -582,11 +582,14 @@ public class ChatService {
             if (deleteds.isEmpty()) {
                 throw new ChatException("User never voted");
             }
-            poll.getRecord().setPollVotes(filtered);
+
+            ChatRecord chatRecord = poll.getRecord();
+            chatRecord.setPollVotes(filtered);
 
             pollRepository.save(poll);
-            poll.getRecord().incrementVersion();
-            chatRecordRepository.save(poll.getRecord());
+
+            chatRecord.incrementVersion();
+
             voteRepository.bulkDeleteByIds(deleteds.stream().map(Vote::getId).toList());
 
             Set<User> participants = chatRoom.getParticipants();
@@ -594,6 +597,8 @@ public class ChatService {
             Map<String, Object> payload = new HashMap<>();
             payload.put("id", poll.getRecord().getId());
             payload.put("votes", poll.getRecord().getPollVotes());
+
+            chatRecordRepository.save(chatRecord);
 
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
