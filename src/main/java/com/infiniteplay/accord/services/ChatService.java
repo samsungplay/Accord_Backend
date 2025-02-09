@@ -63,6 +63,7 @@ public class ChatService {
 
     @Autowired
     private ChatRecordRepository chatRecordRepository;
+
     @Autowired
     private ChatRoomRepository chatRoomRepository;
     @Autowired
@@ -574,10 +575,10 @@ public class ChatService {
             }
 
             List<Vote> filtered = poll.getRecord().getPollVotes().stream()
-                    .filter(vote_ -> !vote_.getVoter().getId().equals(user.getId())).toList();
+                    .filter(vote_ -> !vote_.getVoter().getId().equals(user.getId())).collect(Collectors.toCollection(ArrayList::new));
 
             List<Vote> deleteds = poll.getRecord().getPollVotes().stream()
-                    .filter(vote_ -> vote_.getVoter().getId().equals(user.getId())).toList();
+                    .filter(vote_ -> vote_.getVoter().getId().equals(user.getId())).collect(Collectors.toCollection(ArrayList::new));
 
             if (deleteds.isEmpty()) {
                 throw new ChatException("User never voted");
@@ -586,19 +587,19 @@ public class ChatService {
             ChatRecord chatRecord = poll.getRecord();
             chatRecord.setPollVotes(filtered);
 
-            pollRepository.save(poll);
-
             chatRecord.incrementVersion();
 
-            voteRepository.bulkDeleteByIds(deleteds.stream().map(Vote::getId).toList());
+            chatRecordRepository.save(chatRecord);
+
+            voteRepository.bulkDeleteByIds(deleteds.stream().map(Vote::getId).collect(Collectors.toCollection(ArrayList::new)));
 
             Set<User> participants = chatRoom.getParticipants();
 
             Map<String, Object> payload = new HashMap<>();
             payload.put("id", poll.getRecord().getId());
-            payload.put("votes", poll.getRecord().getPollVotes());
+            payload.put("votes", filtered);
 
-            chatRecordRepository.save(chatRecord);
+
 
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -1212,7 +1213,7 @@ public class ChatService {
             throw new ChatException("Too many filters set - try simplifying your search filters!");
         }
         //remove duplicates
-        return rawTags.stream().distinct().toList();
+        return rawTags.stream().distinct().collect(Collectors.toCollection(ArrayList::new));
     }
 
     @Transactional(readOnly = true)

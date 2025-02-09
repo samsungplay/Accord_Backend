@@ -811,7 +811,7 @@ public class CallService {
         Sound sound = null;
 
 
-        if (Arrays.stream(defaultSounds.split(",")).toList().contains(name)) {
+        if (Arrays.stream(defaultSounds.split(",")).collect(Collectors.toCollection(ArrayList::new)).contains(name)) {
             sound = soundRepository.findDefaultSounds().stream().filter(e -> e.getName().equals(name)).findFirst().get();
         } else {
             ChatRoom chatRoom = call.getChatRoom();

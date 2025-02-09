@@ -50,7 +50,7 @@ public class UserService {
 
         List<Integer> mutedChatRoomIds = user.getMutedChatRoomIds() != null ? new ArrayList<>(Arrays.asList(user.getMutedChatRoomIds())) : new ArrayList<>();
         //lazily clean up any outdated chatroomIds
-        mutedChatRoomIds = mutedChatRoomIds.stream().filter(chatRoomIds::contains).collect(Collectors.toList());
+        mutedChatRoomIds = mutedChatRoomIds.stream().filter(chatRoomIds::contains).collect(Collectors.toCollection(ArrayList::new));
         if (mutedChatRoomIds.contains(chatRoomId)) {
             throw new UserException("User already muted this chatroom");
         }
@@ -67,11 +67,11 @@ public class UserService {
         Set<Integer> chatRoomIds = user.getChatRooms().stream().map(ChatRoom::getId).collect(Collectors.toSet());
         List<Integer> mutedChatRoomIds = user.getMutedChatRoomIds() != null ? new ArrayList<>(Arrays.asList(user.getMutedChatRoomIds())) : new ArrayList<>();
         //lazily clean up any outdated chatroomIds
-        mutedChatRoomIds = mutedChatRoomIds.stream().filter(chatRoomIds::contains).collect(Collectors.toList());
+        mutedChatRoomIds = mutedChatRoomIds.stream().filter(chatRoomIds::contains).collect(Collectors.toCollection(ArrayList::new));
         if (!mutedChatRoomIds.contains(chatRoomId)) {
             throw new UserException("User has not muted this chatroom");
         }
-        mutedChatRoomIds = mutedChatRoomIds.stream().filter(e -> e != chatRoomId).toList();
+        mutedChatRoomIds = mutedChatRoomIds.stream().filter(e -> e != chatRoomId).collect(Collectors.toCollection(ArrayList::new));
         user.setMutedChatRoomIds(mutedChatRoomIds.toArray(new Integer[0]));
         userRepository.save(user);
         return mutedChatRoomIds;
@@ -89,7 +89,7 @@ public class UserService {
         return new UserSettingsDTO(user.getSpamFilterMode(), user.getNsfwDmFriends(), user.getNsfwDmOthers(),
                 user.getNsfwGroups(), user.isAllowNonFriendsDM(), user.isAllowFriendRequestEveryone(), user.isAllowFriendRequestFof(), user.isAllowFriendRequestGroup(), user.getEntranceSound(),
                 user.isCanPreviewStream(), user.getNotifyReaction(), user.getDoNotification(), user.getMessageRequests(),
-                user.getMutedChatRoomIds() != null ? Arrays.stream(user.getMutedChatRoomIds()).collect(Collectors.toList()) : new ArrayList<>(), user.getDisplaySpoiler());
+                user.getMutedChatRoomIds() != null ? Arrays.stream(user.getMutedChatRoomIds()).collect(Collectors.toCollection(ArrayList::new)) : new ArrayList<>(), user.getDisplaySpoiler());
     }
 
     @Transactional

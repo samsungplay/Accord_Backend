@@ -180,7 +180,7 @@ public class ChatRoomService {
         if (!chatRoom.getPublic()) {
             throw new GenericException("This chatroom is not open to public");
         }
-        List<String> currentParticipantNames = new ArrayList<>(chatRoom.getParticipants().stream().map(e -> e.getUsername() + "@" + e.getId()).toList());
+        List<String> currentParticipantNames = new ArrayList<>(chatRoom.getParticipants().stream().map(e -> e.getUsername() + "@" + e.getId()).collect(Collectors.toCollection(ArrayList::new)));
 
         if (currentParticipantNames.contains(usernameWithId)) {
             throw new ChatRoomException("User already in this chatroom");
@@ -207,7 +207,7 @@ public class ChatRoomService {
         }
         ChatRoom chatRoom = findChatRoomByIdOnly(invitation.getChatRoomId());
 
-        List<String> currentParticipantNames = new ArrayList<>(chatRoom.getParticipants().stream().map(e -> e.getUsername() + "@" + e.getId()).toList());
+        List<String> currentParticipantNames = new ArrayList<>(chatRoom.getParticipants().stream().map(e -> e.getUsername() + "@" + e.getId()).collect(Collectors.toCollection(ArrayList::new)));
 
         if (currentParticipantNames.contains(usernameWithId)) {
             throw new ChatRoomException("User already in this chatroom");
@@ -444,7 +444,7 @@ public class ChatRoomService {
                 throw new ChatRoomException("Target user is not a moderator");
             }
 
-            modIds = modIds.stream().filter(e -> e != targetUserId).toList();
+            modIds = modIds.stream().filter(e -> e != targetUserId).collect(Collectors.toCollection(ArrayList::new));
 
             if (modIds.isEmpty()) {
                 chatRoom.setModIds(null);
@@ -913,7 +913,7 @@ public class ChatRoomService {
 
         ChatRoom chatRoom = findChatRoomById(usernameWithId, id_);
 
-        List<ChatNotificationCount> notificationCounts = chatNotificationCountRepository.findByChatRoomIdAndUserIds(chatRoom.getId(), chatRoom.getParticipants().stream().map(User::getId).toList());
+        List<ChatNotificationCount> notificationCounts = chatNotificationCountRepository.findByChatRoomIdAndUserIds(chatRoom.getId(), chatRoom.getParticipants().stream().map(User::getId).collect(Collectors.toCollection(ArrayList::new)));
         Map<Integer, User> participantsMap = new HashMap<>();
 
         for (User participant : chatRoom.getParticipants()) {
@@ -1389,7 +1389,7 @@ public class ChatRoomService {
 
         }
         if (!kicked.isEmpty()) {
-            checkRoomPermission(currentChatRoom, userId, kicked.stream().map(e -> Integer.parseInt(e.split("@")[1])).toList(), roleSettings.getRoleAllowKickUser());
+            checkRoomPermission(currentChatRoom, userId, kicked.stream().map(e -> Integer.parseInt(e.split("@")[1])).collect(Collectors.toCollection(ArrayList::new)), roleSettings.getRoleAllowKickUser());
         }
 
 
@@ -1744,7 +1744,7 @@ public class ChatRoomService {
 
 
         if (
-                (soundData.getType().equals("sound") && Arrays.stream(defaultSounds.split(",")).toList().contains(soundData.getName())) ||
+                (soundData.getType().equals("sound") && Arrays.stream(defaultSounds.split(",")).collect(Collectors.toCollection(ArrayList::new)).contains(soundData.getName())) ||
                         chatRoom.getSounds().stream().anyMatch(e -> e.getName().equals(soundData.getName()) && e.getType().equals(soundData.getType()))
         ) {
             if (soundData.getType().equals("sound"))

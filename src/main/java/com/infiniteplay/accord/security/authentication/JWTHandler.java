@@ -17,10 +17,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -100,7 +97,7 @@ public class JWTHandler {
 
         Jws<Claims> jws = parser.verifyWith(key).build().parseSignedClaims(token);
 
-        List<SimpleGrantedAuthority> authorities = Arrays.stream(jws.getPayload().get("authorities").toString().split(",")).map(SimpleGrantedAuthority::new).toList();
+        List<SimpleGrantedAuthority> authorities = Arrays.stream(jws.getPayload().get("authorities").toString().split(",")).map(SimpleGrantedAuthority::new).collect(Collectors.toCollection(ArrayList::new));
 
         return new UsernamePasswordAuthenticationToken(jws.getPayload().getSubject(),"jwt_verified",authorities);
 
@@ -109,7 +106,7 @@ public class JWTHandler {
     public Authentication readRefreshToken(String token) throws JwtException {
         Jws<Claims> jws = parser.verifyWith(refreshKey).build().parseSignedClaims(token);
 
-        List<SimpleGrantedAuthority> authorities = Arrays.stream(jws.getPayload().get("authorities").toString().split(",")).map(SimpleGrantedAuthority::new).toList();
+        List<SimpleGrantedAuthority> authorities = Arrays.stream(jws.getPayload().get("authorities").toString().split(",")).map(SimpleGrantedAuthority::new).collect(Collectors.toCollection(ArrayList::new));
 
         return new UsernamePasswordAuthenticationToken(jws.getPayload().getSubject(),"jwt_verified",authorities);
     }

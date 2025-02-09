@@ -27,6 +27,7 @@ import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 public class PushNotificationService {
@@ -131,7 +132,7 @@ public class PushNotificationService {
 
     @Transactional(readOnly = true)
     public void sendChatNotifications(Collection<User> users, List<ChatRecord> chatRecords, ChatRoom chatRoom) {
-        List<Integer> userIds = users.stream().map(User::getId).toList();
+        List<Integer> userIds = users.stream().map(User::getId).collect(Collectors.toCollection(ArrayList::new));
         List<PushSubscription> pushSubscriptions = pushSubscriptionRepository.findByUserIdIn(userIds);
         Map<Integer, PushSubscription> pushNotificationLookup = new HashMap<>();
         for (PushSubscription pushSubscription : pushSubscriptions) {
@@ -140,7 +141,7 @@ public class PushNotificationService {
 
 
         boolean isGroupChat = chatRoom.getDirect1to1Identifier() == null || chatRoom.getDirect1to1Identifier().isEmpty();
-        List<Integer> dmIds = !isGroupChat ? Arrays.stream(chatRoom.getDirect1to1Identifier().split("@")).map(Integer::parseInt).toList() : List.of();
+        List<Integer> dmIds = !isGroupChat ? Arrays.stream(chatRoom.getDirect1to1Identifier().split("@")).map(Integer::parseInt).collect(Collectors.toCollection(ArrayList::new)) : List.of();
 
 
         Map<String, String> participantUsernameLookup = new HashMap<>();
