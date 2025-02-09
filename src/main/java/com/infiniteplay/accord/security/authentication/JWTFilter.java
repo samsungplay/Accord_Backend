@@ -108,7 +108,7 @@ public class JWTFilter extends OncePerRequestFilter {
                 filterChain.doFilter(request, response);
             } catch (ExpiredJwtException e) {
                 //jwt expired (i.e. access token expired)
-                logger.debug("Jwt expired");
+                logger.info("Jwt expired");
                 //try to refresh using refresh token
                 if (refreshToken != null) {
                     try {
@@ -116,13 +116,14 @@ public class JWTFilter extends OncePerRequestFilter {
                         String username = authentication.getName().split("@")[0];
                         int id = Integer.parseInt(authentication.getName().split("@")[1]);
                         if (!userRepository.existsByUsernameWithId(id,username)) {
+                            logger.info("refresh user does not exist");
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             Map<String, String> errors = new HashMap<>();
                             errors.put("error", "invalid user");
                             resetAuthCookies(response);
                             response.getOutputStream().println(mapper.writeValueAsString(errors));
                         } else {
-                            String newAccessToken = jwtHandler.createToken(authentication.getName(), authentication.getAuthorities(), true);
+                            String newAccessToken = jwtHandler.createToken(authentication.getName(), authentication.getAuthorities(), false);
                             //refresh access token, (issue a new access token)
                             ResponseCookie cookie = ResponseCookie.from("accord_access_token", newAccessToken)
                                     .path("/")
@@ -136,14 +137,17 @@ public class JWTFilter extends OncePerRequestFilter {
                             SecurityContext securityContext = SecurityContextHolder.getContext();
                             securityContext.setAuthentication(authentication);
 
-                            logger.debug("jwt refreshed");
+                            logger.info("jwt refreshed");
+                            filterChain.doFilter(request, response);
                         }
                     } catch (Exception ex) {
                         //refresh token also invalid
+                        logger.info("refresh token invalid");
                         resetAuthCookies(response);
                         filterChain.doFilter(request, response);
                     }
                 } else {
+                    logger.info("no refresh token");
                     //no refresh cookie present
                     resetAuthCookies(response);
                     filterChain.doFilter(request, response);
