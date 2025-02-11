@@ -161,7 +161,7 @@ public class ChatRoomService {
             return null;
         }
 
-        if (System.currentTimeMillis() > invitation.getExpiration().getTime()) {
+        if (!invitation.isPermanent() && System.currentTimeMillis() > invitation.getExpiration().getTime()) {
             return null;
         }
 
