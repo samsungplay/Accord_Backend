@@ -11,5 +11,5 @@ public class RegexConstants {
     public static final String PASSWORD_CONTAINS_DIGIT_REGEX = "[\\d]";
 
     public static final String PASSWORD_CONTAINS_UPPERCASE_REGEX = "[A-Z]";
-    public static final String FILENAME_REGEX = "^[\\p{L}\\p{N}\\-. ]+$";
+    public static final String FILENAME_REGEX = "^[\\p{L}\\p{N}\\-. _]+$";
 }
