@@ -27,6 +27,7 @@ import java.util.Objects;
         @Index(columnList = "date"),
         @Index(columnList = "poll"),
         @Index(columnList = "reply_target_sender_id"),
+        @Index(columnList = "scheduled_time")
 
 })
 public class ChatRecord extends BaseEntity {
@@ -114,6 +115,18 @@ public class ChatRecord extends BaseEntity {
     @JsonProperty("chatRoomIdRef")
     @Column(nullable = true)
     private Integer chatRoomIdReference;
+
+    @Column(nullable = true, name="scheduled_time")
+    @JsonIgnore
+    private Long scheduledTime;
+
+    public Long getScheduledTime() {
+        return scheduledTime;
+    }
+
+    public void setScheduledTime(Long scheduledTime) {
+        this.scheduledTime = scheduledTime;
+    }
 
     public Integer getId() {
         return id;

@@ -29,4 +29,5 @@ public interface ChatRecordRepository extends JpaRepository<ChatRecord, Integer>
     void updateReplyTargetMessage(String replyTargetMessage, Integer replyTargetId);
 
 
+
 }

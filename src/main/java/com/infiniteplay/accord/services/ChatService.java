@@ -2,6 +2,7 @@ package com.infiniteplay.accord.services;
 
 import ai.djl.inference.Predictor;
 import ai.djl.translate.TranslateException;
+import com.infiniteplay.accord.annotations.EnsureConsistency;
 import com.infiniteplay.accord.entities.*;
 import com.infiniteplay.accord.models.*;
 import com.infiniteplay.accord.repositories.*;
@@ -9,6 +10,7 @@ import com.infiniteplay.accord.utils.ChatException;
 import com.infiniteplay.accord.utils.GenericException;
 import com.infiniteplay.accord.utils.RegexConstants;
 import com.infiniteplay.accord.utils.TimeUtils;
+import jakarta.validation.constraints.Null;
 import org.hibernate.Hibernate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.lang.Nullable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -546,14 +549,6 @@ public class ChatService {
         }
     }
 
-    @Transactional
-    public void computeNotificationData(ChatRecord chatRecord) {
-
-
-
-    }
-
-
 
     @Transactional
     public void unVotePoll(String usernameWithId, String chatroomId, String pollId) throws GenericException {
@@ -600,7 +595,6 @@ public class ChatService {
             payload.put("votes", filtered);
 
 
-
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
@@ -627,8 +621,8 @@ public class ChatService {
 
     public void dispatchTypingEvent(String usernamewithId, int chatRoomId, List<String> participantUsernameWithIds) throws GenericException {
 
-        for(String user : participantUsernameWithIds) {
-            if(!user.equals(usernamewithId))
+        for (String user : participantUsernameWithIds) {
+            if (!user.equals(usernamewithId))
                 broker.convertAndSendToUser(user, "/general/onUserType/" + chatRoomId, userService.extractId(usernamewithId));
         }
     }
@@ -722,7 +716,7 @@ public class ChatService {
                     continue;
                 }
                 ChatNotificationCount cnt = chatNotificationCountRepository.findByChatRoomIdAndUserId(Integer.parseInt(chatroomId), participant.getId());
-                if(cnt == null) {
+                if (cnt == null) {
                     throw new GenericException("Unexpected error while updating chat notification data");
                 }
                 if (cnt.getLatestMessageId() == null) {
@@ -730,8 +724,7 @@ public class ChatService {
                     cnt.setLatestMessageId(recorded.getId());
                     cnt.setFirstUnreadTimestamp(recorded.getDate().toInstant().toEpochMilli());
                     cnt.setCount(1);
-                }
-                else
+                } else
                     cnt.setCount(cnt.getCount() + 1);
                 chatNotificationCountRepository.save(cnt);
             }
@@ -754,8 +747,7 @@ public class ChatService {
                 //send push notifications to offline users
                 try {
                     pushNotificationService.sendChatNotifications(participants, List.of(chatRecord), chatRoom);
-                }
-                catch(Exception e) {
+                } catch (Exception e) {
                     log.error("error while sending push notification: " + e.getMessage());
                 }
 
@@ -781,14 +773,102 @@ public class ChatService {
 
     @Transactional
     public ChatRecord sendMessage(String usernameWithId, String chatroomId, ChatMessage message, MultipartFile[] attachments,
-                                  String attachmentsMetadata) {
-        return sendMessage(usernameWithId, chatroomId, message, attachments, attachmentsMetadata, null);
+                                  String attachmentsMetadata, @Nullable Long scheduledTime) {
+        return sendMessage(usernameWithId, chatroomId, message, attachments, attachmentsMetadata, null, scheduledTime, null, null, false);
+    }
+
+    @Transactional
+    @Scheduled(fixedRate = 60000)
+    @EnsureConsistency
+    public void processScheduledMessages() throws GenericException {
+        //process scheduled messages
+        //retrieve all past scheduled records up to current time
+
+        List<ChatRecord> scheduledChatRecords = chatRecordRepository.getScheduledRecords(null, null, System.currentTimeMillis());
+
+        //actually send the messages
+        for (ChatRecord scheduled : scheduledChatRecords) {
+            String usernameWithId = scheduled.getSender().getUsername() + "@" + scheduled.getSender().getId();
+            String chatRoomId = scheduled.getChatRoomIdReference().toString();
+            ChatMessage message = new ChatMessage(scheduled.getMessage(), scheduled.getReplyTargetId() == null ? null : scheduled.getReplyTargetId().toString(),
+                    scheduled.getReplyTargetSender() == null ? null : scheduled.getReplyTargetSender().getId().toString(), scheduled.getReplyTargetMessage());
+            sendMessage(usernameWithId, chatRoomId, message, null, null, null, null,
+                    scheduled.getAttachments(), scheduled.getAttachmentsMetadata(), true);
+        }
+        //delete the scheduled messages
+        chatRecordRepository.deleteAll(scheduledChatRecords);
+
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChatRecord> getScheduledChatRecords(String usernameWithId, String chatRoomId) throws GenericException {
+        ChatRoom chatRoom = chatRoomService.findChatRoomById(usernameWithId, chatRoomId);
+        List<ChatRecord> chatRecords = chatRecordRepository.getScheduledRecords(chatRoom, userService.findByUsernameWithId(usernameWithId), null);
+        return chatRecords;
     }
 
 
     @Transactional
+    public void unscheduleMessage(String usernameWithId, int chatRecordId) throws GenericException {
+        int userId = userService.extractId(usernameWithId);
+        ChatRecord chatRecord = chatRecordRepository.findById(chatRecordId).orElse(null);
+        if (chatRecord == null || !chatRecord.getSender().getId().equals(userId)) {
+            throw new GenericException("Message not found");
+        }
+
+        //no need to handle deleting chat reactions or other associated entities because scheduled messages can't have one
+
+        chatRecordRepository.delete(chatRecord);
+        String attachmentsCode = chatRecord.getAttachments();
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+
+                //delete attachments, if there were any
+                if (attachmentsCode != null && !attachmentsCode.isEmpty()) {
+                    List<String> paths = new ArrayList<>();
+                    String[] files = attachmentsCode.split(",");
+
+                    for (String file : files) {
+                        String[] data = file.split(";");
+                        UUID uuid = UUID.fromString(data[0]);
+                        String fileName = data[2];
+                        String fullFileName = uuid + "_" + fileName;
+                        paths.add(fullFileName);
+                    }
+
+
+                    deleteAttachments(paths);
+                }
+
+            }
+        });
+    }
+
+
+    @Transactional
+    public void rescheduleMessage(String usernameWithId, int chatRecordId, long newScheduleTime) throws GenericException {
+        int userId = userService.extractId(usernameWithId);
+        ChatRecord chatRecord = chatRecordRepository.findById(chatRecordId).orElse(null);
+        if (chatRecord == null || !chatRecord.getSender().getId().equals(userId)) {
+            throw new GenericException("This message has already been unscheduled!");
+        }
+
+        if (newScheduleTime <= System.currentTimeMillis()) {
+            throw new GenericException("You are scheduling a message in the past or a too near future!");
+        }
+        chatRecord.setScheduledTime(newScheduleTime);
+        chatRecord.setDate(ZonedDateTime.ofInstant(Instant.ofEpochMilli(newScheduleTime),TimeUtils.KST_ZONE));
+
+        chatRecordRepository.save(chatRecord);
+    }
+
+    @Transactional
     public ChatRecord sendMessage(String usernameWithId, String chatroomId, ChatMessage message, MultipartFile[] attachments,
-                                  String attachmentsMetadata, ZonedDateTime customDate) throws GenericException {
+                                  String attachmentsMetadata, @Nullable ZonedDateTime customDate, @Nullable Long scheduledTime,
+                                  @Nullable String presetAttachmentsCode, @Nullable String presetAttachmentsMetadata,
+                                  boolean notifySelf) throws GenericException {
 
 
         String attachmentCode = null, actualPaths = null;
@@ -826,13 +906,22 @@ public class ChatService {
                 }
             }
             //instantiate new chatrecord
-            ZonedDateTime now = TimeUtils.getCurrentKST();
+
+            ZonedDateTime now = scheduledTime == null ? TimeUtils.getCurrentKST() : ZonedDateTime.ofInstant(Instant.ofEpochMilli(scheduledTime), TimeUtils.KST_ZONE);
             if (message.getPayload().isEmpty() && attachmentCode == null) {
                 throw new ChatException("Cannot send empty message");
             }
             if (message.getPayload().length() > 255) {
                 throw new ChatException("Message is too long");
             }
+
+            if (scheduledTime != null) {
+                List<ChatRecord> scheduledChatRecords = chatRecordRepository.getScheduledRecords(chatRoom, user, null);
+                if (scheduledChatRecords.size() >= 50) {
+                    throw new GenericException("You cannot schedule more than 50 messages per room!");
+                }
+            }
+
             ChatRecord chatRecord = new ChatRecord(null, "text", message.getPayload(), customDate != null ? customDate : now);
             chatRecord.setSender(user);
             chatRecord.setChatRoom(chatRoom);
@@ -841,8 +930,15 @@ public class ChatService {
                 chatRecord.setAttachments(attachmentCode);
                 chatRecord.setAttachmentsMetadata(attachmentsMetadata);
             }
-            chatRoom.getChatRecords().add(chatRecord);
-            chatRoom.setRecentMessageDate(now);
+            if (presetAttachmentsCode != null && presetAttachmentsMetadata != null) {
+                chatRecord.setAttachments(presetAttachmentsCode);
+                chatRecord.setAttachmentsMetadata(presetAttachmentsMetadata);
+            }
+
+            if (scheduledTime == null) {
+                chatRoom.setRecentMessageDate(now);
+                chatRoom.getChatRecords().add(chatRecord);
+            }
             if (message.getReplyTarget() != null && message.getReplyTargetSenderId() != null && message.getReplyTargetMessage() != null
                     && !message.getReplyTarget().isEmpty() && !message.getReplyTargetSenderId().isEmpty() && !message.getReplyTargetMessage().isEmpty()) {
                 chatRecord.setReplyTargetMessage(message.getReplyTargetMessage());
@@ -884,15 +980,36 @@ public class ChatService {
             boolean isSpam = aiService.detectSpam(chatRecord.getMessage());
             chatRecord.setSpam(isSpam);
 
-            ChatRecord recorded = chatRecordRepository.save(chatRecord);
+            if (scheduledTime != null) {
+                chatRecord.setScheduledTime(scheduledTime);
+            }
 
+            ChatRecord recorded = chatRecordRepository.save(chatRecord);
+            String finalActualPaths = actualPaths;
+
+            if (scheduledTime != null) {
+                //this message is scheduled to be sent later; stop processing further
+                if (scheduledTime <= System.currentTimeMillis()) {
+                    throw new GenericException("You are scheduling a message in the past or a too near future!");
+                }
+
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        //save attachments, if there were any, for later use
+                        if (attachments != null && finalActualPaths != null)
+                            saveAttachments(attachments, finalActualPaths);
+                    }
+                });
+                return recorded;
+            }
 
 
             //update notifications for participants
             for (User participant : chatRoom.getParticipants()) {
 
 
-                if (participant.getId() != userId) {
+                if (participant.getId() != userId || notifySelf) {
                     boolean isGroupChat = chatRoom.getDirect1to1Identifier() == null || chatRoom.getDirect1to1Identifier().isEmpty();
                     boolean isFriends = userRepository.isFriend(userId, participant.getId());
                     //if the participant has blocked this user, do not update the participant's notification count
@@ -929,7 +1046,7 @@ public class ChatService {
 
                         if (shouldUpdateSpamNotification) {
                             ChatNotificationCount cnt = chatNotificationCountRepository.findByChatRoomIdAndUserId(-1, participant.getId());
-                            if(cnt == null) {
+                            if (cnt == null) {
                                 throw new GenericException("Unexpected error while updating chat notification data");
                             }
                             if (cnt.getLatestMessageId() == null) {
@@ -937,8 +1054,7 @@ public class ChatService {
                                 cnt.setLatestMessageId(recorded.getId());
                                 cnt.setFirstUnreadTimestamp(recorded.getDate().toInstant().toEpochMilli());
                                 cnt.setCount(1);
-                            }
-                            else
+                            } else
                                 cnt.setCount(cnt.getCount() + 1);
                             chatNotificationCountRepository.save(cnt);
                         }
@@ -977,7 +1093,7 @@ public class ChatService {
 
                     if (shouldUpdateNotification) {
                         ChatNotificationCount cnt = chatNotificationCountRepository.findByChatRoomIdAndUserId(Integer.parseInt(chatroomId), participant.getId());
-                        if(cnt == null) {
+                        if (cnt == null) {
                             throw new GenericException("Unexpected error while updating chat notification data");
                         }
                         if (cnt.getLatestMessageId() == null) {
@@ -986,8 +1102,7 @@ public class ChatService {
                             cnt.setFirstUnreadTimestamp(recorded.getDate().toInstant().toEpochMilli());
 
                             cnt.setCount(1);
-                        }
-                        else
+                        } else
                             cnt.setCount(cnt.getCount() + 1);
 
                         chatNotificationCountRepository.save(cnt);
@@ -999,7 +1114,6 @@ public class ChatService {
 
             Set<User> participants = chatRoom.getParticipants();
 
-            String finalActualPaths = actualPaths;
 
             Hibernate.initialize(chatRoom.getParticipants());
 
@@ -1015,13 +1129,10 @@ public class ChatService {
                     payload.put("chatRecord", chatRecord);
 
 
-
-
                     //send push notifications to offline users
                     try {
                         pushNotificationService.sendChatNotifications(participants, List.of(chatRecord), chatRoom);
-                    }
-                    catch(Exception e) {
+                    } catch (Exception e) {
                         log.error("Error while sending push notification: " + e.getMessage());
                         e.printStackTrace();
                     }
@@ -1029,7 +1140,7 @@ public class ChatService {
 
                     //broadcast message to its participants
                     for (User participant : participants) {
-                        if (participant.getId() != userId) {
+                        if (participant.getId() != userId || notifySelf) {
 
                             broker.convertAndSendToUser(participant.getUsername() + "@" + participant.getId(), "/general/onChatMessage/" + chatRoom.getId(), Map.of("chatRecord", chatRecord));
                             if (recorded.getSpam()) {
@@ -1038,7 +1149,6 @@ public class ChatService {
                             broker.convertAndSendToUser(participant.getUsername() + "@" + participant.getId(), "/general/onChatMessage", payload);
 
                         }
-
 
 
                     }
@@ -1583,12 +1693,12 @@ public class ChatService {
         try {
             //validate user belongs to this chatroom
             ChatRoom chatRoom = chatRoomService.findChatRoomById(usernameWithId, chatroomId);
-            if(chatRoom.getDirect1to1Identifier() == null || chatRoom.getDirect1to1Identifier().isEmpty()) {
+            if (chatRoom.getDirect1to1Identifier() == null || chatRoom.getDirect1to1Identifier().isEmpty()) {
                 ChatRoomRoleSettings roleSettings = chatRoomRoleSettingsRepository.findByChatRoomId(chatRoom.getId());
-                if(roleSettings == null) {
+                if (roleSettings == null) {
                     throw new GenericException("Unexpected error while unpinning messages");
                 }
-                chatRoomService.checkRoomPermission(chatRoom, userService.extractId(usernameWithId), null,roleSettings.getRoleAllowPinMessage() );
+                chatRoomService.checkRoomPermission(chatRoom, userService.extractId(usernameWithId), null, roleSettings.getRoleAllowPinMessage());
             }
 
             ChatRecord chatRecord = chatRecordRepository.findById(Integer.parseInt(chatRecordId)).orElse(null);

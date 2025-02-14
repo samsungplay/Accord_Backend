@@ -35,5 +35,7 @@ public interface CustomChatRecordRepository {
 
     List<ChatRecord> getPrevPageSpam(Set<ChatRoom> userChatRooms, Integer nextPageFirstId, Set<User> blockeds, ContentFilterFlag nsfwFlag, Set<User> customUserFilter);
 
+    List<ChatRecord> getScheduledRecords(@Nullable ChatRoom chatRoom, @Nullable User scheduler, @Nullable Long currentTime);
+
 
 }

@@ -37,6 +37,29 @@ public class ChatController {
     @Autowired
     private RateLimiterService rateLimiterService;
 
+    @GetMapping("/message/scheduled/{chatRoomId}")
+    public List<ChatRecord> getScheduledMessages(Authentication authentication, @PathVariable String chatRoomId) {
+        return chatService.getScheduledChatRecords(authentication.getName(), chatRoomId);
+    }
+
+    @DeleteMapping("/message/scheduled/{chatRecordId}")
+    public ResponseEntity<Void> unscheduleMessage(Authentication authentication, @PathVariable int chatRecordId) {
+        chatService.unscheduleMessage(authentication.getName(), chatRecordId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/message/scheduled/{chatRecordId}")
+    public ResponseEntity<Void> rescheduleMessage(Authentication authentication, @PathVariable int chatRecordId,
+                                                  @RequestBody Map<String, String> payload
+    ) {
+        try {
+            chatService.rescheduleMessage(authentication.getName(), chatRecordId, Long.parseLong(payload.get("scheduledTime")));
+        } catch (NumberFormatException e) {
+            throw new GenericException("Invalid reschedule request");
+        }
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/message/type/{chatRoomId}")
     public void dispatchTypingEvent(Authentication authentication, @PathVariable int chatRoomId,
                                     @RequestBody List<String> participants) {
@@ -46,8 +69,8 @@ public class ChatController {
     @PostMapping("/message/search/{chatRoomId}")
     public List<ChatRecord> searchMessage(Authentication authentication, @PathVariable String chatRoomId,
                                           @RequestBody ChatRecordSearchParameters searchParameters,
-                                          @RequestParam(name="nsfw",defaultValue = "ANY") String nsfwFlag,
-                                          @RequestParam(name="spam", defaultValue = "ANY") String spamFlag) {
+                                          @RequestParam(name = "nsfw", defaultValue = "ANY") String nsfwFlag,
+                                          @RequestParam(name = "spam", defaultValue = "ANY") String spamFlag) {
 
         return chatService.searchChatRecord(authentication.getName(), chatRoomId, searchParameters.getCursorId(),
                 searchParameters.getPrevious(), searchParameters.getOrder(), searchParameters.getContent(),
@@ -56,18 +79,17 @@ public class ChatController {
     }
 
 
-
     @GetMapping("/message/verify/{chatRoomId}/{chatRecordId}")
     public ResponseEntity<Void> verifyMessageExistsById(Authentication authentication,
                                                         @PathVariable String chatRoomId,
                                                         @PathVariable String chatRecordId,
-                                                        @RequestParam(name="nsfw",defaultValue = "ANY") String nsfwFlag,
-                                                        @RequestParam(name="spam", defaultValue = "ANY") String spamFlag
+                                                        @RequestParam(name = "nsfw", defaultValue = "ANY") String nsfwFlag,
+                                                        @RequestParam(name = "spam", defaultValue = "ANY") String spamFlag
 
-                                                        ) {
+    ) {
 
-        if(chatRoomId.equals(("-1"))) {
-            chatService.verifySpamCheckRecordExistsById(authentication.getName(),chatRecordId,
+        if (chatRoomId.equals(("-1"))) {
+            chatService.verifySpamCheckRecordExistsById(authentication.getName(), chatRecordId,
                     ContentFilterFlag.valueOf(nsfwFlag));
             return ResponseEntity.ok().build();
         }
@@ -113,6 +135,7 @@ public class ChatController {
 
     }
 
+
     @DeleteMapping("/message/attachments/{chatroomId}/{chatrecordId}/{attachmentId}")
     public ResponseEntity<String> deleteAttachment(Authentication authentication, @PathVariable String chatroomId,
                                                    @PathVariable String chatrecordId, @PathVariable String attachmentId) {
@@ -131,13 +154,14 @@ public class ChatController {
                                                                      @RequestParam("replyTargetMessage") String replyTargetMessage,
                                                                      @RequestParam("attachmentsMetadata") String attachmentsMetadata,
                                                                      @RequestParam("attachments") MultipartFile[] attachments,
+                                                                     @RequestParam(value = "scheduledTime", required = false) Long scheduledTime,
                                                                      @PathVariable("chatroomId") String chatroomId) {
         if (!rateLimiterService.limitRate("dispatchMessage", authentication.getName(), 1, Duration.ofMillis(500))) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
         }
 
         ChatRecord recorded = chatService.sendMessage(authentication.getName(), chatroomId, new ChatMessage(message, replyTarget, replyTargetSenderId,
-                replyTargetMessage), attachments, attachmentsMetadata);
+                replyTargetMessage), attachments, attachmentsMetadata, scheduledTime);
 
 
         return ResponseEntity.ok(recorded);
@@ -181,15 +205,15 @@ public class ChatController {
 
 
         ChatRecord recorded = chatService.sendMessage(authentication.getName(), chatroomId, new ChatMessage(chatMessage.get("message"), chatMessage.get("replyTarget"), chatMessage.get("replyTargetSenderId"),
-                chatMessage.get("replyTargetMessage")), null, null);
+                chatMessage.get("replyTargetMessage")), null, null, chatMessage.get("scheduledTime") == null ? null : Long.parseLong(chatMessage.get("scheduledTime")));
 
         return ResponseEntity.ok(recorded);
     }
 
     @GetMapping("/message/{chatroomId}/pinned")
     public List<ChatRecord> getPinnedMessages(Authentication authentication, @PathVariable String chatroomId,
-                                              @RequestParam(name="nsfw",defaultValue = "ANY") String nsfwFlag,
-                                              @RequestParam(name="spam", defaultValue = "ANY") String spamFlag) {
+                                              @RequestParam(name = "nsfw", defaultValue = "ANY") String nsfwFlag,
+                                              @RequestParam(name = "spam", defaultValue = "ANY") String spamFlag) {
         return chatService.getPinnedChatRecords(authentication.getName(), chatroomId,
                 ContentFilterFlag.valueOf(nsfwFlag),
                 ContentFilterFlag.valueOf(spamFlag));
@@ -211,19 +235,18 @@ public class ChatController {
     @GetMapping("/message/{chatroomId}")
     public List<ChatRecord> getMessages(Authentication authentication, @PathVariable String chatroomId,
                                         @RequestParam("pageKey") Integer pageKey,
-                                        @RequestParam(name="nsfw",defaultValue = "ANY") String nsfwFlag,
-                                        @RequestParam(name="spam", defaultValue = "ANY") String spamFlag
+                                        @RequestParam(name = "nsfw", defaultValue = "ANY") String nsfwFlag,
+                                        @RequestParam(name = "spam", defaultValue = "ANY") String spamFlag
 
     ) {
 
-        if(chatroomId.equals("-1")) {
+        if (chatroomId.equals("-1")) {
             return chatService.getSpamChatRecords(authentication.getName(), pageKey, pageKey < 0, ContentFilterFlag.valueOf(nsfwFlag));
         }
 
         return chatService.getChatRecords(authentication.getName(), chatroomId, pageKey, pageKey < 0,
                 ContentFilterFlag.valueOf(nsfwFlag), ContentFilterFlag.valueOf(spamFlag));
     }
-
 
 
     @PostMapping("/reaction/{chatroomId}/{chatRecordId}")
@@ -252,7 +275,7 @@ public class ChatController {
         return ResponseEntity.badRequest().body(ex.getMessage());
     }
 
-    @ExceptionHandler(value={
+    @ExceptionHandler(value = {
             StaleObjectStateException.class,
             OptimisticLockingFailureException.class,
             OptimisticLockException.class

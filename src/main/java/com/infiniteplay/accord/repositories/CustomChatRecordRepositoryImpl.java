@@ -73,19 +73,19 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
 
         if (!querySpam) {
             if (cursorId > 0) {
-                queryBuilder.append(" AND (c.chatRoom= :chatRoom) AND (c.type <> 'text' or c.sender not in :blockeds) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%'))");
-                queryBuilder2.append(" AND (c.chatRoom= :chatRoom) AND (c.type <> 'text' or c.sender not in :blockeds) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%'))");
+                queryBuilder.append(" AND (c.chatRoom= :chatRoom) AND (c.type <> 'text' or c.sender not in :blockeds) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%')) and c.scheduledTime IS NULL");
+                queryBuilder2.append(" AND (c.chatRoom= :chatRoom) AND (c.type <> 'text' or c.sender not in :blockeds) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%')) and c.scheduledTime IS NULL");
             } else {
-                queryBuilder.append(" (c.chatRoom= :chatRoom) AND (c.type <> 'text' or c.sender not in :blockeds) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%'))");
-                queryBuilder2.append(" (c.chatRoom= :chatRoom) AND (c.type <> 'text' or c.sender not in :blockeds) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%'))");
+                queryBuilder.append(" (c.chatRoom= :chatRoom) AND (c.type <> 'text' or c.sender not in :blockeds) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%')) and c.scheduledTime IS NULL");
+                queryBuilder2.append(" (c.chatRoom= :chatRoom) AND (c.type <> 'text' or c.sender not in :blockeds) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%')) and c.scheduledTime IS NULL");
             }
         } else {
             if (cursorId > 0) {
-                queryBuilder.append(" AND (c.chatRoom in :chatRooms) AND (c.type = 'text' and c.sender not in :blockeds)");
-                queryBuilder2.append(" AND (c.chatRoom in :chatRooms) AND (c.type = 'text' and c.sender not in :blockeds)");
+                queryBuilder.append(" AND (c.chatRoom in :chatRooms) AND (c.type = 'text' and c.sender not in :blockeds) AND c.scheduledTime IS NULL");
+                queryBuilder2.append(" AND (c.chatRoom in :chatRooms) AND (c.type = 'text' and c.sender not in :blockeds) AND c.scheduledTime IS NULL");
             } else {
-                queryBuilder.append(" (c.chatRoom in :chatRooms) AND (c.type = 'text' and c.sender not in :blockeds)");
-                queryBuilder2.append(" (c.chatRoom in :chatRooms) AND (c.type = 'text' and c.sender not in :blockeds)");
+                queryBuilder.append(" (c.chatRoom in :chatRooms) AND (c.type = 'text' and c.sender not in :blockeds) AND c.scheduledTime IS NULL");
+                queryBuilder2.append(" (c.chatRoom in :chatRooms) AND (c.type = 'text' and c.sender not in :blockeds) AND c.scheduledTime IS NULL");
             }
         }
 
@@ -102,7 +102,7 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
         queryBuilder.append(getFlags(nsfwFlag, spamFlag));
         queryBuilder2.append(getFlags(nsfwFlag, spamFlag));
 
-        if(customUserFilter != null) {
+        if (customUserFilter != null) {
             queryBuilder.append(" and c.sender in :users");
             queryBuilder2.append(" and c.sender in :users");
         }
@@ -130,9 +130,9 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
             searchQuery2.setParameter("chatRooms", userChatRooms);
         }
 
-        if(customUserFilter != null) {
-            searchQuery.setParameter("users",customUserFilter);
-            searchQuery2.setParameter("users",customUserFilter);
+        if (customUserFilter != null) {
+            searchQuery.setParameter("users", customUserFilter);
+            searchQuery2.setParameter("users", customUserFilter);
         }
 
         for (ChatRecordSearchFilter filter : filters) {
@@ -164,28 +164,28 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
 
 
             TypedQuery<ChatRecord> recordsQuery = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.chatReactions cr where" +
-                            " (c.chatRoom in :chatRooms) and (c.type = 'text') and (c.sender not in :blockeds)" + getFlags(nsfwFlag, ContentFilterFlag.INCLUDE) +
+                            " (c.chatRoom in :chatRooms) and (c.type = 'text') and (c.sender not in :blockeds) and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, ContentFilterFlag.INCLUDE) +
                             (customUserFilter != null ? " and c.sender in :users" : "") +
                             " order by c.id desc", ChatRecord.class)
                     .setParameter("chatRooms", userChatRooms)
                     .setParameter("blockeds", blockeds)
                     .setMaxResults(perPageCount);
-            if(customUserFilter != null) {
-                recordsQuery.setParameter("users",customUserFilter);
+            if (customUserFilter != null) {
+                recordsQuery.setParameter("users", customUserFilter);
             }
 
             records = recordsQuery.getResultList();
 
 
             recordsQuery = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.pollVotes p LEFT JOIN FETCH p.voter where" +
-                            " (c.chatRoom in :chatRoom) and (c.type = 'text') and (c.sender not in :blockeds)" + getFlags(nsfwFlag, ContentFilterFlag.INCLUDE) +
+                            " (c.chatRoom in :chatRoom) and (c.type = 'text') and (c.sender not in :blockeds) and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, ContentFilterFlag.INCLUDE) +
                             (customUserFilter != null ? " and c.sender in :users" : "") +
                             " order by c.id desc", ChatRecord.class)
                     .setParameter("chatRoom", userChatRooms)
                     .setParameter("blockeds", blockeds)
                     .setMaxResults(perPageCount);
-            if(customUserFilter != null) {
-                recordsQuery.setParameter("users",customUserFilter);
+            if (customUserFilter != null) {
+                recordsQuery.setParameter("users", customUserFilter);
             }
             records = recordsQuery.getResultList();
 
@@ -193,7 +193,7 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
         } else {
             List<ChatRecord> records = null;
             TypedQuery<ChatRecord> recordsQuery = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.chatReactions cr where" +
-                            " c.id < :lastId and (c.chatRoom in :chatRooms) and (c.type = 'text') and (c.sender not in :blockeds)" + getFlags(nsfwFlag, ContentFilterFlag.INCLUDE) +
+                            " c.id < :lastId and (c.chatRoom in :chatRooms) and (c.type = 'text') and (c.sender not in :blockeds) and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, ContentFilterFlag.INCLUDE) +
                             (customUserFilter != null ? " and c.sender in :users" : "") +
                             " order by c.id desc", ChatRecord.class)
                     .setParameter("chatRooms", userChatRooms)
@@ -201,14 +201,14 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
                     .setParameter("lastId", prevPageLastId)
                     .setMaxResults(perPageCount);
 
-            if(customUserFilter != null) {
-                recordsQuery.setParameter("users",customUserFilter);
+            if (customUserFilter != null) {
+                recordsQuery.setParameter("users", customUserFilter);
             }
 
             records = recordsQuery.getResultList();
 
             recordsQuery = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.pollVotes p LEFT JOIN FETCH p.voter where" +
-                            " c.id < :lastId and (c.chatRoom in :chatRooms) and (c.type = 'text') and (c.sender not in :blockeds)" + getFlags(nsfwFlag, ContentFilterFlag.INCLUDE) +
+                            " c.id < :lastId and (c.chatRoom in :chatRooms) and (c.type = 'text') and (c.sender not in :blockeds) and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, ContentFilterFlag.INCLUDE) +
                             (customUserFilter != null ? " and c.sender in :users" : "") +
                             " order by c.id desc", ChatRecord.class)
                     .setParameter("chatRooms", userChatRooms)
@@ -216,8 +216,8 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
                     .setParameter("lastId", prevPageLastId)
                     .setMaxResults(perPageCount);
 
-            if(customUserFilter != null) {
-                recordsQuery.setParameter("users",customUserFilter);
+            if (customUserFilter != null) {
+                recordsQuery.setParameter("users", customUserFilter);
             }
             records = recordsQuery.getResultList();
             return records;
@@ -230,7 +230,7 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
 
         List<ChatRecord> records = null;
         TypedQuery<ChatRecord> recordsQuery = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.chatReactions cr where" +
-                        " c.id > :firstId and (c.chatRoom in :chatRooms) and (c.type = 'text') and (c.sender not in :blockeds)" + getFlags(nsfwFlag, ContentFilterFlag.INCLUDE) +
+                        " c.id > :firstId and (c.chatRoom in :chatRooms) and (c.type = 'text') and (c.sender not in :blockeds) and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, ContentFilterFlag.INCLUDE) +
                         (customUserFilter != null ? " and c.sender in :users" : "") +
                         " order by c.id asc", ChatRecord.class)
                 .setParameter("chatRooms", userChatRooms)
@@ -239,12 +239,12 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
                 .setParameter("users", customUserFilter)
                 .setMaxResults(perPageCount);
 
-        if(customUserFilter != null) {
-            recordsQuery.setParameter("users",customUserFilter);
+        if (customUserFilter != null) {
+            recordsQuery.setParameter("users", customUserFilter);
         }
         records = recordsQuery.getResultList();
         recordsQuery = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.pollVotes p LEFT JOIN FETCH p.voter where" +
-                        " c.id > :firstId and (c.chatRoom in :chatRooms) and (c.type = 'text') and (c.sender not in :blockeds)" + getFlags(nsfwFlag, ContentFilterFlag.INCLUDE) +
+                        " c.id > :firstId and (c.chatRoom in :chatRooms) and (c.type = 'text') and (c.sender not in :blockeds) and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, ContentFilterFlag.INCLUDE) +
                         (customUserFilter != null ? " and c.sender in :users" : "") +
                         " order by c.id asc", ChatRecord.class)
                 .setParameter("chatRooms", userChatRooms)
@@ -253,8 +253,8 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
                 .setParameter("users", customUserFilter)
                 .setMaxResults(perPageCount);
 
-        if(customUserFilter != null) {
-            recordsQuery.setParameter("users",customUserFilter);
+        if (customUserFilter != null) {
+            recordsQuery.setParameter("users", customUserFilter);
         }
         records = recordsQuery.getResultList();
         Collections.reverse(records);
@@ -290,7 +290,7 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
 
 
         Long count = (Long) (em.createQuery("SELECT COUNT(c) from ChatRecord c WHERE c.id = :id and c.chatRoom = :chatRoom and " +
-                "(c.type <> 'text' or c.sender not in :blockeds) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%'))" + getFlags(nsfwFlag, spamFlag)))
+                "(c.type <> 'text' or c.sender not in :blockeds) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%')) and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, spamFlag)))
                 .setParameter("id", id)
                 .setParameter("chatRoom", chatRoom)
                 .setParameter("blockeds", blockeds)
@@ -305,19 +305,19 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
                                          @Nullable Set<User> customUserFilter) {
 
 
-        Query countQuery =  em.createQuery("SELECT COUNT(c) from ChatRecord c WHERE c.id = :id and c.chatRoom in :chatRooms and " +
-                        "(c.type = 'text' and c.sender not in :blockeds)" + getFlags(nsfwFlag, ContentFilterFlag.INCLUDE)
+        Query countQuery = em.createQuery("SELECT COUNT(c) from ChatRecord c WHERE c.id = :id and c.chatRoom in :chatRooms and " +
+                        "(c.type = 'text' and c.sender not in :blockeds) and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, ContentFilterFlag.INCLUDE)
                         + (customUserFilter != null ? " and c.sender in :users" : "")
                 )
                 .setParameter("id", id)
                 .setParameter("chatRooms", userChatRooms)
                 .setParameter("blockeds", blockeds);
 
-        if(customUserFilter != null) {
+        if (customUserFilter != null) {
             countQuery.setParameter("users", customUserFilter);
         }
 
-        return (Long)countQuery.getSingleResult() > 0;
+        return (Long) countQuery.getSingleResult() > 0;
     }
 
     @Override
@@ -325,7 +325,7 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
         if (prevPageLastId.equals(0)) {
             //simply fetch the first 20 entries
             List<ChatRecord> records = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.chatReactions cr where" +
-                            " (c.chatRoom= :chatRoom and (c.type <> 'text' or c.sender not in :blockeds)) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%'))" + getFlags(nsfwFlag, spamFlag) +
+                            " (c.chatRoom= :chatRoom and (c.type <> 'text' or c.sender not in :blockeds)) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%')) and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, spamFlag) +
                             " order by c.id desc", ChatRecord.class)
                     .setParameter("chatRoom", chatRoom)
                     .setParameter("blockeds", blockeds)
@@ -334,7 +334,7 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
                     .getResultList();
 
             records = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.pollVotes p LEFT JOIN FETCH p.voter where" +
-                            " (c.chatRoom= :chatRoom and (c.type <> 'text' or c.sender not in :blockeds)) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%'))" + getFlags(nsfwFlag, spamFlag) +
+                            " (c.chatRoom= :chatRoom and (c.type <> 'text' or c.sender not in :blockeds)) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%')) and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, spamFlag) +
                             " order by c.id desc", ChatRecord.class)
                     .setParameter("chatRoom", chatRoom)
                     .setParameter("blockeds", blockeds)
@@ -344,7 +344,7 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
             return records;
         } else {
             List<ChatRecord> records = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.chatReactions cr where" +
-                            " c.id < :lastId and (c.chatRoom= :chatRoom and (c.type <> 'text' or c.sender not in :blockeds)) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%'))" + getFlags(nsfwFlag, spamFlag) +
+                            " c.id < :lastId and (c.chatRoom= :chatRoom and (c.type <> 'text' or c.sender not in :blockeds)) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%')) and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, spamFlag) +
                             " order by c.id desc", ChatRecord.class)
                     .setParameter("chatRoom", chatRoom)
                     .setParameter("blockeds", blockeds)
@@ -354,7 +354,7 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
                     .getResultList();
 
             records = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.pollVotes p LEFT JOIN FETCH p.voter where" +
-                            " c.id < :lastId and (c.chatRoom= :chatRoom and (c.type <> 'text' or c.sender not in :blockeds)) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%'))" + getFlags(nsfwFlag, spamFlag) +
+                            " c.id < :lastId and (c.chatRoom= :chatRoom and (c.type <> 'text' or c.sender not in :blockeds)) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%')) and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, spamFlag) +
                             " order by c.id desc", ChatRecord.class)
                     .setParameter("chatRoom", chatRoom)
                     .setParameter("blockeds", blockeds)
@@ -370,7 +370,7 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
     @Override
     public List<ChatRecord> getPrevPageByChatRoomIdBlockFiltered(ChatRoom chatRoom, Set<User> blockeds, Integer nextPageFirstId, int forUserId, ContentFilterFlag nsfwFlag, ContentFilterFlag spamFlag) {
         List<ChatRecord> records = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.chatReactions cr where" +
-                        " c.id > :firstId and (c.chatRoom= :chatRoom and (c.type <> 'text' or c.sender not in :blockeds)) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%'))" + getFlags(nsfwFlag, spamFlag) +
+                        " c.id > :firstId and (c.chatRoom= :chatRoom and (c.type <> 'text' or c.sender not in :blockeds)) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%')) and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, spamFlag) +
                         " order by c.id asc", ChatRecord.class)
                 .setParameter("chatRoom", chatRoom)
                 .setParameter("blockeds", blockeds)
@@ -380,7 +380,7 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
                 .getResultList();
 
         records = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.pollVotes p LEFT JOIN FETCH p.voter where" +
-                        " c.id > :firstId and (c.chatRoom= :chatRoom and (c.type <> 'text' or c.sender not in :blockeds)) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%'))" + getFlags(nsfwFlag, spamFlag) +
+                        " c.id > :firstId and (c.chatRoom= :chatRoom and (c.type <> 'text' or c.sender not in :blockeds)) and (c.type NOT LIKE 'system_private%' or c.type LIKE CONCAT(:forUserId,'%')) and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, spamFlag) +
                         " order by c.id asc", ChatRecord.class)
                 .setParameter("chatRoom", chatRoom)
                 .setParameter("blockeds", blockeds)
@@ -397,14 +397,14 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
     @Override
     public List<ChatRecord> getAllPinnedByChatRoomIdBlockFiltered(ChatRoom chatRoom, Set<User> blockeds, ContentFilterFlag nsfwFlag, ContentFilterFlag spamFlag) {
         List<ChatRecord> records = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.chatReactions cr where" +
-                        " (c.chatRoom= :chatRoom and c.sender not in :blockeds) and c.pinned = true" + getFlags(nsfwFlag, spamFlag) +
+                        " (c.chatRoom= :chatRoom and c.sender not in :blockeds) and c.pinned = true and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, spamFlag) +
                         " order by c.date desc", ChatRecord.class)
                 .setParameter("chatRoom", chatRoom)
                 .setParameter("blockeds", blockeds)
                 .getResultList();
 
         records = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.pollVotes p LEFT JOIN FETCH p.voter where" +
-                        " (c.chatRoom= :chatRoom and c.sender not in :blockeds) and c.pinned = true" + getFlags(nsfwFlag, spamFlag) +
+                        " (c.chatRoom= :chatRoom and c.sender not in :blockeds) and c.pinned = true and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, spamFlag) +
                         " order by c.date desc", ChatRecord.class)
                 .setParameter("chatRoom", chatRoom)
                 .setParameter("blockeds", blockeds)
@@ -417,16 +417,59 @@ public class CustomChatRecordRepositoryImpl implements CustomChatRecordRepositor
     public List<ChatRecord> getAllPinnedByChatRoomId(ChatRoom chatRoom, ContentFilterFlag nsfwFlag, ContentFilterFlag spamFlag) {
 
         List<ChatRecord> records = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.chatReactions cr where" +
-                        " c.chatRoom= :chatRoom and c.pinned = true" + getFlags(nsfwFlag, spamFlag) +
+                        " c.chatRoom= :chatRoom and c.pinned = true and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, spamFlag) +
                         " order by c.date desc", ChatRecord.class)
                 .setParameter("chatRoom", chatRoom)
                 .getResultList();
 
         records = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.pollVotes p LEFT JOIN FETCH p.voter where" +
-                        " c.chatRoom= :chatRoom and c.pinned = true" + getFlags(nsfwFlag, spamFlag) +
+                        " c.chatRoom= :chatRoom and c.pinned = true and (c.scheduledTime IS NULL)" + getFlags(nsfwFlag, spamFlag) +
                         " order by c.date desc", ChatRecord.class)
                 .setParameter("chatRoom", chatRoom)
                 .getResultList();
+
+        return records;
+    }
+
+    @Override
+    public List<ChatRecord> getScheduledRecords(@Nullable ChatRoom chatRoom, @Nullable User scheduler, @Nullable Long currentTime) {
+        StringBuilder extraQueryBuilder = new StringBuilder();
+
+        if (chatRoom != null) {
+            extraQueryBuilder.append(" and c.chatRoom= :chatRoom");
+        }
+        if (scheduler != null) {
+            extraQueryBuilder.append(" and c.sender= :sender");
+        }
+        if (currentTime != null) {
+            extraQueryBuilder.append(" and c.scheduledTime <= :currentTime");
+        } else {
+            extraQueryBuilder.append(" and c.scheduledTime is not null");
+        }
+        String extraQuery = extraQueryBuilder.toString();
+        extraQuery = extraQuery.substring(extraQuery.indexOf(" and") + " and".length());
+        TypedQuery<ChatRecord> recordQuery = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.chatReactions cr where" +
+                extraQuery +
+                " order by c.date desc", ChatRecord.class);
+
+        TypedQuery<ChatRecord> recordQuery2 = em.createQuery("SELECT c from ChatRecord c LEFT JOIN FETCH c.sender LEFT JOIN FETCH c.poll LEFT JOIN FETCH c.replyTargetSender LEFT JOIN FETCH c.pollVotes p LEFT JOIN FETCH p.voter where" +
+                extraQuery +
+                " order by c.date desc", ChatRecord.class);
+        if (chatRoom != null) {
+            recordQuery.setParameter("chatRoom", chatRoom);
+            recordQuery2.setParameter("chatRoom", chatRoom);
+        }
+        if (scheduler != null) {
+            recordQuery.setParameter("sender", scheduler);
+            recordQuery2.setParameter("sender", scheduler);
+        }
+        if (currentTime != null) {
+            recordQuery.setParameter("currentTime", currentTime);
+            recordQuery2.setParameter("currentTime", currentTime);
+        }
+
+        List<ChatRecord> records = recordQuery.getResultList();
+        records = recordQuery2.getResultList();
 
         return records;
     }
