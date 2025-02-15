@@ -15,11 +15,12 @@ A real-time chat web application built from scratch as a personal project to exp
 ### 👥 Social & Messaging
 - **Friend system** allowing users to send, accept, and manage friend requests.
 - **Customizable profiles** with randomly generated avatars, profile image uploads, status messages, and markdown-supported bios.
-- **Real-time messaging** with markdown support, message editing, replies, and reactions.
+- **Real-time messaging** with markdown support, message editing, replies, voicemails, and reactions.
 - **Comprehensive file sharing**, supporting images, text files, coding files (.cpp, .java), audio, and videos with inline previews and players.
 - **Chat searching system** with powerful filters (by user, mentions, date range, pinned messages, etc.).
 - **Emoji reactions** similar to Discord, allowing users to react to messages dynamically.
 - **Spam and NSFW filtering**, configurable based on user preferences.
+- **Scheduled messaging**, supports scheduling messages on any specific minute into the future
 
 ### 📢 Group Chats & Rooms
 - **Group chatrooms** supporting up to 10 participants.
