@@ -1,5 +1,5 @@
 # Accord 🚀
-
+Frontend Repo: https://github.com/samsungplay/Accord_Frontend
 A real-time chat web application built from scratch as a personal project to explore the complexities of modern chat systems. Inspired by popular platforms, Accord aims to provide a functional and engaging communication experience while pushing my own learning in full-stack development.
 
 ## 🌍 Live Demo
